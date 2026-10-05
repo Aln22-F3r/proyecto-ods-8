@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LoginSocial extends Model
 {
-    protected $table = 'login_social';
+    protected $table = 'login_sociales';
 
     public function usuario(): BelongsTo
     {

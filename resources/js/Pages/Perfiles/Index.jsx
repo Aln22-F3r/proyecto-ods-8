@@ -1,31 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const perfiles = [
-    {
-        id: 1,
-        usuario: "Ana López",
-        profesion_oficio: "Desarrolladora web",
-        experiencia: 4,
-        ciudad: "Guadalajara",
-    },
-    {
-        id: 2,
-        usuario: "Carlos Ramírez",
-        profesion_oficio: "Electricista",
-        experiencia: 10,
-        ciudad: "Zapopan",
-    },
-    {
-        id: 3,
-        usuario: "María Torres",
-        profesion_oficio: "Diseñadora gráfica",
-        experiencia: 2,
-        ciudad: "Tlaquepaque",
-    },
-];
-
-export default function Index() {
+export default function Index({ perfiles }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -51,13 +28,15 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {perfiles.map((p) => (
+                        {perfiles.data.map((p) => (
                             <tr
                                 key={p.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{p.id}</td>
-                                <td className="px-4 py-3">{p.usuario}</td>
+                                <td className="px-4 py-3">
+                                    {p.usuario?.nombre} {p.usuario?.apellido}
+                                </td>
                                 <td className="px-4 py-3">
                                     {p.profesion_oficio}
                                 </td>
@@ -90,6 +69,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={perfiles.links} />
         </AdminLayout>
     );
 }

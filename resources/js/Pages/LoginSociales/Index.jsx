@@ -1,31 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const loginSociales = [
-    {
-        id: 1,
-        usuario: "Ana López",
-        proveedor: "Google",
-        proveedor_id: "108273645091827364501",
-        correo: "ana@gmail.com",
-    },
-    {
-        id: 2,
-        usuario: "Carlos Ramírez",
-        proveedor: "Facebook",
-        proveedor_id: "5738291046572819",
-        correo: "carlos@correo.com",
-    },
-    {
-        id: 3,
-        usuario: "María Torres",
-        proveedor: "GitHub",
-        proveedor_id: "48271936",
-        correo: "maria@correo.com",
-    },
-];
-
-export default function Index() {
+export default function Index({ loginSociales }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -53,13 +30,15 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {loginSociales.map((l) => (
+                        {loginSociales.data.map((l) => (
                             <tr
                                 key={l.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{l.id}</td>
-                                <td className="px-4 py-3">{l.usuario}</td>
+                                <td className="px-4 py-3">
+                                    {l.usuario?.nombre} {l.usuario?.apellido}
+                                </td>
                                 <td className="px-4 py-3">{l.proveedor}</td>
                                 <td className="px-4 py-3">{l.proveedor_id}</td>
                                 <td className="px-4 py-3">{l.correo}</td>
@@ -90,6 +69,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={loginSociales.links} />
         </AdminLayout>
     );
 }

@@ -1,31 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const logs = [
-    {
-        id: 1,
-        usuario: "Ana López",
-        accion: "Inició sesión",
-        fecha: "2026-10-01",
-        ip: "192.168.1.10",
-    },
-    {
-        id: 2,
-        usuario: "Carlos Ramírez",
-        accion: "Publicó una oferta de empleo",
-        fecha: "2026-10-02",
-        ip: "192.168.1.25",
-    },
-    {
-        id: 3,
-        usuario: "María Torres",
-        accion: "Se postuló a una oferta",
-        fecha: "2026-10-03",
-        ip: "192.168.1.31",
-    },
-];
-
-export default function Index() {
+export default function Index({ logs }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -51,13 +28,15 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {logs.map((l) => (
+                        {logs.data.map((l) => (
                             <tr
                                 key={l.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{l.id}</td>
-                                <td className="px-4 py-3">{l.usuario}</td>
+                                <td className="px-4 py-3">
+                                    {l.usuario?.nombre} {l.usuario?.apellido}
+                                </td>
                                 <td className="px-4 py-3">{l.accion}</td>
                                 <td className="px-4 py-3">{l.fecha}</td>
                                 <td className="px-4 py-3">{l.ip}</td>
@@ -88,6 +67,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={logs.links} />
         </AdminLayout>
     );
 }

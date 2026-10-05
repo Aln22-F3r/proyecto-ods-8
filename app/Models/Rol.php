@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Rol extends Model
 {
+    protected $table = 'roles';
 
     public function usuarios(): HasMany
     {

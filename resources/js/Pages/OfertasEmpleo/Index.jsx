@@ -1,40 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const ofertas = [
-    {
-        id: 1,
-        titulo: "Desarrollador web",
-        empresa: "Tech Solutions",
-        categoria: "Tecnología",
-        ubicacion: "Guadalajara",
-        salario: "18,000.00",
-        tipo_empleo: "Tiempo completo",
-        estado: "Abierta",
-    },
-    {
-        id: 2,
-        titulo: "Albañil",
-        empresa: "Constructora Occidente",
-        categoria: "Construcción",
-        ubicacion: "Zapopan",
-        salario: "9,500.00",
-        tipo_empleo: "Por obra",
-        estado: "Abierta",
-    },
-    {
-        id: 3,
-        titulo: "Diseñador gráfico",
-        empresa: "Estudio Creativo",
-        categoria: "Diseño",
-        ubicacion: "Tlaquepaque",
-        salario: "12,000.00",
-        tipo_empleo: "Medio tiempo",
-        estado: "Cerrada",
-    },
-];
-
-export default function Index() {
+export default function Index({ ofertas }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -65,7 +33,7 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {ofertas.map((o) => (
+                        {ofertas.data.map((o) => (
                             <tr
                                 key={o.id}
                                 className="border-t border-[#4a4141]"
@@ -73,7 +41,9 @@ export default function Index() {
                                 <td className="px-4 py-3">{o.id}</td>
                                 <td className="px-4 py-3">{o.titulo}</td>
                                 <td className="px-4 py-3">{o.empresa}</td>
-                                <td className="px-4 py-3">{o.categoria}</td>
+                                <td className="px-4 py-3">
+                                    {o.categoria?.nombre}
+                                </td>
                                 <td className="px-4 py-3">{o.ubicacion}</td>
                                 <td className="px-4 py-3">${o.salario}</td>
                                 <td className="px-4 py-3">{o.tipo_empleo}</td>
@@ -105,6 +75,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={ofertas.links} />
         </AdminLayout>
     );
 }

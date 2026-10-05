@@ -1,37 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const usuarios = [
-    {
-        id: 1,
-        rol: "Administrador",
-        nombre: "Ana",
-        apellido: "López",
-        correo: "ana@correo.com",
-        telefono: "3312345678",
-        estado: "Activo",
-    },
-    {
-        id: 2,
-        rol: "Empresa",
-        nombre: "Carlos",
-        apellido: "Ramírez",
-        correo: "carlos@correo.com",
-        telefono: "3398765432",
-        estado: "Activo",
-    },
-    {
-        id: 3,
-        rol: "Candidato",
-        nombre: "María",
-        apellido: "Torres",
-        correo: "maria@correo.com",
-        telefono: "3355511122",
-        estado: "Inactivo",
-    },
-];
-
-export default function Index() {
+export default function Index({ usuarios }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -59,18 +30,20 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {usuarios.map((u) => (
+                        {usuarios.data.map((u) => (
                             <tr
                                 key={u.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{u.id}</td>
-                                <td className="px-4 py-3">{u.rol}</td>
+                                <td className="px-4 py-3">{u.rol?.nombre}</td>
                                 <td className="px-4 py-3">{u.nombre}</td>
                                 <td className="px-4 py-3">{u.apellido}</td>
                                 <td className="px-4 py-3">{u.correo}</td>
                                 <td className="px-4 py-3">{u.telefono}</td>
-                                <td className="px-4 py-3">{u.estado}</td>
+                                <td className="px-4 py-3">
+                                    {u.estado ? "Activo" : "Inactivo"}
+                                </td>
                                 <td className="px-4 py-3">
                                     <div className="flex gap-2">
                                         <Link
@@ -98,6 +71,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={usuarios.links} />
         </AdminLayout>
     );
 }

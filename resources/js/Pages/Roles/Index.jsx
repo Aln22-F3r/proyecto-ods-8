@@ -1,17 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const roles = [
-    { id: 1, nombre: "Administrador", descripcion: "Acceso total al sistema" },
-    {
-        id: 2,
-        nombre: "Empresa",
-        descripcion: "Publica y gestiona ofertas de empleo",
-    },
-    { id: 3, nombre: "Candidato", descripcion: "Busca y se postula a ofertas" },
-];
-
-export default function Index() {
+export default function Index({ roles }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -35,7 +26,7 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {roles.map((r) => (
+                        {roles.data.map((r) => (
                             <tr
                                 key={r.id}
                                 className="border-t border-[#4a4141]"
@@ -70,6 +61,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={roles.links} />
         </AdminLayout>
     );
 }

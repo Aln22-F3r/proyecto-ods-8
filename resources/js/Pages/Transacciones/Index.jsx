@@ -1,34 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const transacciones = [
-    {
-        id: 1,
-        usuario: "Ana López",
-        tipo_registro: "Registro",
-        descripcion: "Alta de usuario en el sistema",
-        fecha: "2026-09-28",
-        estado: "Completada",
-    },
-    {
-        id: 2,
-        usuario: "Carlos Ramírez",
-        tipo_registro: "Publicación",
-        descripcion: "Publicación de una oferta de empleo",
-        fecha: "2026-09-30",
-        estado: "Completada",
-    },
-    {
-        id: 3,
-        usuario: "María Torres",
-        tipo_registro: "Postulación",
-        descripcion: "Postulación a una oferta de empleo",
-        fecha: "2026-10-01",
-        estado: "Pendiente",
-    },
-];
-
-export default function Index() {
+export default function Index({ transacciones }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -57,13 +31,15 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {transacciones.map((t) => (
+                        {transacciones.data.map((t) => (
                             <tr
                                 key={t.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{t.id}</td>
-                                <td className="px-4 py-3">{t.usuario}</td>
+                                <td className="px-4 py-3">
+                                    {t.usuario?.nombre} {t.usuario?.apellido}
+                                </td>
                                 <td className="px-4 py-3">{t.tipo_registro}</td>
                                 <td className="px-4 py-3">{t.descripcion}</td>
                                 <td className="px-4 py-3">{t.fecha}</td>
@@ -95,6 +71,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={transacciones.links} />
         </AdminLayout>
     );
 }

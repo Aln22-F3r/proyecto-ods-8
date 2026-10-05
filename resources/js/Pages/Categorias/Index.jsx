@@ -1,25 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const categorias = [
-    {
-        id: 1,
-        nombre: "Tecnología",
-        descripcion: "Desarrollo de software, soporte y sistemas",
-    },
-    {
-        id: 2,
-        nombre: "Construcción",
-        descripcion: "Oficios y proyectos de construcción",
-    },
-    {
-        id: 3,
-        nombre: "Diseño",
-        descripcion: "Diseño gráfico, web y audiovisual",
-    },
-];
-
-export default function Index() {
+export default function Index({ categorias }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -45,7 +28,7 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {categorias.map((c) => (
+                        {categorias.data.map((c) => (
                             <tr
                                 key={c.id}
                                 className="border-t border-[#4a4141]"
@@ -80,6 +63,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={categorias.links} />
         </AdminLayout>
     );
 }

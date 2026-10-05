@@ -1,31 +1,8 @@
 import { Link } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
+import Paginacion from "../../Components/Paginacion";
 
-const postulaciones = [
-    {
-        id: 1,
-        usuario: "Ana López",
-        oferta: "Desarrollador web",
-        fecha_postulacion: "2026-09-28",
-        estado: "En revisión",
-    },
-    {
-        id: 2,
-        usuario: "Carlos Ramírez",
-        oferta: "Albañil",
-        fecha_postulacion: "2026-09-30",
-        estado: "Aceptada",
-    },
-    {
-        id: 3,
-        usuario: "María Torres",
-        oferta: "Diseñador gráfico",
-        fecha_postulacion: "2026-10-01",
-        estado: "Rechazada",
-    },
-];
-
-export default function Index() {
+export default function Index({ postulaciones }) {
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
@@ -53,14 +30,18 @@ export default function Index() {
                         </tr>
                     </thead>
                     <tbody>
-                        {postulaciones.map((p) => (
+                        {postulaciones.data.map((p) => (
                             <tr
                                 key={p.id}
                                 className="border-t border-[#4a4141]"
                             >
                                 <td className="px-4 py-3">{p.id}</td>
-                                <td className="px-4 py-3">{p.usuario}</td>
-                                <td className="px-4 py-3">{p.oferta}</td>
+                                <td className="px-4 py-3">
+                                    {p.usuario?.nombre} {p.usuario?.apellido}
+                                </td>
+                                <td className="px-4 py-3">
+                                    {p.oferta_empleo?.titulo}
+                                </td>
                                 <td className="px-4 py-3">
                                     {p.fecha_postulacion}
                                 </td>
@@ -92,6 +73,8 @@ export default function Index() {
                     </tbody>
                 </table>
             </div>
+
+            <Paginacion links={postulaciones.links} />
         </AdminLayout>
     );
 }
