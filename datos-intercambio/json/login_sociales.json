@@ -1,0 +1,49 @@
+{
+  "login_sociales": [
+    {
+      "id": 1,
+      "usuario_id": 1,
+      "usuario": {
+        "id": 1,
+        "nombre": "Ana",
+        "apellido": "López",
+        "correo": "ana@correo.com"
+      },
+      "proveedor": "Google",
+      "proveedor_id": "108273645091827364501",
+      "correo": "ana@gmail.com",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 2,
+      "usuario_id": 2,
+      "usuario": {
+        "id": 2,
+        "nombre": "Carlos",
+        "apellido": "Ramírez",
+        "correo": "carlos@correo.com"
+      },
+      "proveedor": "Facebook",
+      "proveedor_id": "5738291046572819",
+      "correo": "carlos@correo.com",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 3,
+      "usuario_id": 3,
+      "usuario": {
+        "id": 3,
+        "nombre": "María",
+        "apellido": "Torres",
+        "correo": "maria@correo.com"
+      },
+      "proveedor": "GitHub",
+      "proveedor_id": "48271936",
+      "correo": "maria@correo.com",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    }
+  ]
+}

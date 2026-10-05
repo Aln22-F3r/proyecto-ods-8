@@ -1,0 +1,49 @@
+{
+  "logs": [
+    {
+      "id": 1,
+      "usuario_id": 1,
+      "usuario": {
+        "id": 1,
+        "nombre": "Ana",
+        "apellido": "López",
+        "correo": "ana@correo.com"
+      },
+      "accion": "Inició sesión",
+      "fecha": "2026-10-01 08:05:00",
+      "ip": "192.168.1.10",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 2,
+      "usuario_id": 2,
+      "usuario": {
+        "id": 2,
+        "nombre": "Carlos",
+        "apellido": "Ramírez",
+        "correo": "carlos@correo.com"
+      },
+      "accion": "Publicó una oferta de empleo",
+      "fecha": "2026-10-02 11:20:00",
+      "ip": "192.168.1.25",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 3,
+      "usuario_id": 3,
+      "usuario": {
+        "id": 3,
+        "nombre": "María",
+        "apellido": "Torres",
+        "correo": "maria@correo.com"
+      },
+      "accion": "Se postuló a una oferta",
+      "fecha": "2026-10-03 16:40:00",
+      "ip": "192.168.1.31",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    }
+  ]
+}

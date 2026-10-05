@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roles>
+  <rol>
+    <id>1</id>
+    <nombre>Administrador</nombre>
+    <descripcion>Acceso total al sistema</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </rol>
+  <rol>
+    <id>2</id>
+    <nombre>Empresa</nombre>
+    <descripcion>Publica y gestiona ofertas de empleo</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </rol>
+  <rol>
+    <id>3</id>
+    <nombre>Candidato</nombre>
+    <descripcion>Busca y se postula a ofertas</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </rol>
+</roles>

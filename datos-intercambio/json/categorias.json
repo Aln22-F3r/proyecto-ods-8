@@ -1,0 +1,25 @@
+{
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Tecnología",
+      "descripcion": "Desarrollo de software, soporte y sistemas",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 2,
+      "nombre": "Construcción",
+      "descripcion": "Oficios y proyectos de construcción",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 3,
+      "nombre": "Diseño",
+      "descripcion": "Diseño gráfico, web y audiovisual",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "perfiles": [
+    {
+      "id": 1,
+      "usuario_id": 1,
+      "usuario": {
+        "id": 1,
+        "nombre": "Ana",
+        "apellido": "López",
+        "correo": "ana@correo.com"
+      },
+      "profesion_oficio": "Desarrolladora web",
+      "descripcion": "Desarrolladora con experiencia en aplicaciones web",
+      "experiencia": 4,
+      "habilidades": "PHP, Laravel, React, MySQL",
+      "ciudad": "Guadalajara",
+      "cv": "cv/ana_lopez.pdf",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 2,
+      "usuario_id": 2,
+      "usuario": {
+        "id": 2,
+        "nombre": "Carlos",
+        "apellido": "Ramírez",
+        "correo": "carlos@correo.com"
+      },
+      "profesion_oficio": "Electricista",
+      "descripcion": "Instalaciones eléctricas residenciales e industriales",
+      "experiencia": 10,
+      "habilidades": "Instalación eléctrica, mantenimiento, lectura de planos",
+      "ciudad": "Zapopan",
+      "cv": "cv/carlos_ramirez.pdf",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 3,
+      "usuario_id": 3,
+      "usuario": {
+        "id": 3,
+        "nombre": "María",
+        "apellido": "Torres",
+        "correo": "maria@correo.com"
+      },
+      "profesion_oficio": "Diseñadora gráfica",
+      "descripcion": "Diseñadora enfocada en identidad de marca",
+      "experiencia": 2,
+      "habilidades": "Photoshop, Illustrator, Figma",
+      "ciudad": "Tlaquepaque",
+      "cv": "cv/maria_torres.pdf",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    }
+  ]
+}

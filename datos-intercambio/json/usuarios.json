@@ -1,0 +1,190 @@
+{
+  "usuarios": [
+    {
+      "id": 1,
+      "rol_id": 1,
+      "rol": {
+        "id": 1,
+        "nombre": "Administrador",
+        "descripcion": "Acceso total al sistema"
+      },
+      "nombre": "Ana",
+      "apellido": "López",
+      "correo": "ana@correo.com",
+      "password": "$2y$12$aBcDeFgHiJkLmNoPqRsTuOvWxYz0123456789AbCdEfGhIjKlMnOp1",
+      "telefono": "3312345678",
+      "fecha_registro": "2026-09-01 08:00:00",
+      "estado": true,
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00",
+      "postulaciones": [
+        {
+          "id": 1,
+          "oferta_empleo_id": 1,
+          "oferta_empleo": {
+            "id": 1,
+            "titulo": "Desarrollador web",
+            "empresa": "Tech Solutions",
+            "ubicacion": "Guadalajara",
+            "salario": 18000.0,
+            "tipo_empleo": "Tiempo completo",
+            "estado": "Abierta"
+          },
+          "fecha_postulacion": "2026-09-28 10:00:00",
+          "estado": "En revisión",
+          "comentario": "Interesada en la vacante",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ],
+      "lista_deseos": [
+        {
+          "id": 1,
+          "oferta_empleo_id": 2,
+          "oferta_empleo": {
+            "id": 2,
+            "titulo": "Albañil",
+            "empresa": "Constructora Occidente",
+            "ubicacion": "Zapopan",
+            "salario": 9500.0,
+            "tipo_empleo": "Por obra",
+            "estado": "Abierta"
+          },
+          "fecha_agregado": "2026-09-25 18:00:00",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "rol_id": 2,
+      "rol": {
+        "id": 2,
+        "nombre": "Empresa",
+        "descripcion": "Publica y gestiona ofertas de empleo"
+      },
+      "nombre": "Carlos",
+      "apellido": "Ramírez",
+      "correo": "carlos@correo.com",
+      "password": "$2y$12$bCdEfGhIjKlMnOpQrStUvWxYzA0123456789BcDeFgHiJkLmNoPqR2",
+      "telefono": "3398765432",
+      "fecha_registro": "2026-09-02 09:15:00",
+      "estado": true,
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00",
+      "postulaciones": [
+        {
+          "id": 2,
+          "oferta_empleo_id": 2,
+          "oferta_empleo": {
+            "id": 2,
+            "titulo": "Albañil",
+            "empresa": "Constructora Occidente",
+            "ubicacion": "Zapopan",
+            "salario": 9500.0,
+            "tipo_empleo": "Por obra",
+            "estado": "Abierta"
+          },
+          "fecha_postulacion": "2026-09-30 12:00:00",
+          "estado": "Aceptada",
+          "comentario": "Cuenta con la experiencia requerida",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ],
+      "lista_deseos": [
+        {
+          "id": 3,
+          "oferta_empleo_id": 3,
+          "oferta_empleo": {
+            "id": 3,
+            "titulo": "Diseñador gráfico",
+            "empresa": "Estudio Creativo",
+            "ubicacion": "Tlaquepaque",
+            "salario": 12000.0,
+            "tipo_empleo": "Medio tiempo",
+            "estado": "Cerrada"
+          },
+          "fecha_agregado": "2026-09-27 08:45:00",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "rol_id": 3,
+      "rol": {
+        "id": 3,
+        "nombre": "Candidato",
+        "descripcion": "Busca y se postula a ofertas"
+      },
+      "nombre": "María",
+      "apellido": "Torres",
+      "correo": "maria@correo.com",
+      "password": "$2y$12$cDeFgHiJkLmNoPqRsTuVwXyZaB0123456789CdEfGhIjKlMnOpQrS3",
+      "telefono": "3355511122",
+      "fecha_registro": "2026-09-03 10:30:00",
+      "estado": true,
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00",
+      "postulaciones": [
+        {
+          "id": 3,
+          "oferta_empleo_id": 3,
+          "oferta_empleo": {
+            "id": 3,
+            "titulo": "Diseñador gráfico",
+            "empresa": "Estudio Creativo",
+            "ubicacion": "Tlaquepaque",
+            "salario": 12000.0,
+            "tipo_empleo": "Medio tiempo",
+            "estado": "Cerrada"
+          },
+          "fecha_postulacion": "2026-10-01 09:30:00",
+          "estado": "Rechazada",
+          "comentario": "La vacante ya no está disponible",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        },
+        {
+          "id": 4,
+          "oferta_empleo_id": 1,
+          "oferta_empleo": {
+            "id": 1,
+            "titulo": "Desarrollador web",
+            "empresa": "Tech Solutions",
+            "ubicacion": "Guadalajara",
+            "salario": 18000.0,
+            "tipo_empleo": "Tiempo completo",
+            "estado": "Abierta"
+          },
+          "fecha_postulacion": "2026-10-02 15:00:00",
+          "estado": "En revisión",
+          "comentario": "Interesada en el área de desarrollo",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ],
+      "lista_deseos": [
+        {
+          "id": 2,
+          "oferta_empleo_id": 1,
+          "oferta_empleo": {
+            "id": 1,
+            "titulo": "Desarrollador web",
+            "empresa": "Tech Solutions",
+            "ubicacion": "Guadalajara",
+            "salario": 18000.0,
+            "tipo_empleo": "Tiempo completo",
+            "estado": "Abierta"
+          },
+          "fecha_agregado": "2026-09-26 20:15:00",
+          "created_at": "2026-09-01 10:00:00",
+          "updated_at": "2026-09-01 10:00:00"
+        }
+      ]
+    }
+  ]
+}

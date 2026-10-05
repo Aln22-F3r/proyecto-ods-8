@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='utf-8'?>
+<lista_deseos>
+  <lista_deseo>
+    <id>1</id>
+    <usuario_id>1</usuario_id>
+    <usuario>
+      <id>1</id>
+      <nombre>Ana</nombre>
+      <apellido>López</apellido>
+      <correo>ana@correo.com</correo>
+    </usuario>
+    <oferta_empleo_id>2</oferta_empleo_id>
+    <oferta_empleo>
+      <id>2</id>
+      <titulo>Albañil</titulo>
+      <empresa>Constructora Occidente</empresa>
+      <ubicacion>Zapopan</ubicacion>
+      <salario>9500.00</salario>
+      <tipo_empleo>Por obra</tipo_empleo>
+      <estado>Abierta</estado>
+    </oferta_empleo>
+    <fecha_agregado>2026-09-25 18:00:00</fecha_agregado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </lista_deseo>
+  <lista_deseo>
+    <id>2</id>
+    <usuario_id>3</usuario_id>
+    <usuario>
+      <id>3</id>
+      <nombre>María</nombre>
+      <apellido>Torres</apellido>
+      <correo>maria@correo.com</correo>
+    </usuario>
+    <oferta_empleo_id>1</oferta_empleo_id>
+    <oferta_empleo>
+      <id>1</id>
+      <titulo>Desarrollador web</titulo>
+      <empresa>Tech Solutions</empresa>
+      <ubicacion>Guadalajara</ubicacion>
+      <salario>18000.00</salario>
+      <tipo_empleo>Tiempo completo</tipo_empleo>
+      <estado>Abierta</estado>
+    </oferta_empleo>
+    <fecha_agregado>2026-09-26 20:15:00</fecha_agregado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </lista_deseo>
+  <lista_deseo>
+    <id>3</id>
+    <usuario_id>2</usuario_id>
+    <usuario>
+      <id>2</id>
+      <nombre>Carlos</nombre>
+      <apellido>Ramírez</apellido>
+      <correo>carlos@correo.com</correo>
+    </usuario>
+    <oferta_empleo_id>3</oferta_empleo_id>
+    <oferta_empleo>
+      <id>3</id>
+      <titulo>Diseñador gráfico</titulo>
+      <empresa>Estudio Creativo</empresa>
+      <ubicacion>Tlaquepaque</ubicacion>
+      <salario>12000.00</salario>
+      <tipo_empleo>Medio tiempo</tipo_empleo>
+      <estado>Cerrada</estado>
+    </oferta_empleo>
+    <fecha_agregado>2026-09-27 08:45:00</fecha_agregado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </lista_deseo>
+</lista_deseos>

@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8'?>
+<transacciones>
+  <transaccion>
+    <id>1</id>
+    <usuario_id>1</usuario_id>
+    <usuario>
+      <id>1</id>
+      <nombre>Ana</nombre>
+      <apellido>López</apellido>
+      <correo>ana@correo.com</correo>
+    </usuario>
+    <tipo_registro>Registro</tipo_registro>
+    <descripcion>Alta de usuario en el sistema</descripcion>
+    <fecha>2026-09-28 08:00:00</fecha>
+    <estado>Completada</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </transaccion>
+  <transaccion>
+    <id>2</id>
+    <usuario_id>2</usuario_id>
+    <usuario>
+      <id>2</id>
+      <nombre>Carlos</nombre>
+      <apellido>Ramírez</apellido>
+      <correo>carlos@correo.com</correo>
+    </usuario>
+    <tipo_registro>Publicación</tipo_registro>
+    <descripcion>Publicación de una oferta de empleo</descripcion>
+    <fecha>2026-09-30 11:00:00</fecha>
+    <estado>Completada</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </transaccion>
+  <transaccion>
+    <id>3</id>
+    <usuario_id>3</usuario_id>
+    <usuario>
+      <id>3</id>
+      <nombre>María</nombre>
+      <apellido>Torres</apellido>
+      <correo>maria@correo.com</correo>
+    </usuario>
+    <tipo_registro>Postulación</tipo_registro>
+    <descripcion>Postulación a una oferta de empleo</descripcion>
+    <fecha>2026-10-01 09:30:00</fecha>
+    <estado>Pendiente</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </transaccion>
+</transacciones>

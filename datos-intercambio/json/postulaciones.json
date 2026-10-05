@@ -1,0 +1,104 @@
+{
+  "postulaciones": [
+    {
+      "id": 1,
+      "usuario_id": 1,
+      "usuario": {
+        "id": 1,
+        "nombre": "Ana",
+        "apellido": "López",
+        "correo": "ana@correo.com"
+      },
+      "oferta_empleo_id": 1,
+      "oferta_empleo": {
+        "id": 1,
+        "titulo": "Desarrollador web",
+        "empresa": "Tech Solutions",
+        "ubicacion": "Guadalajara",
+        "salario": 18000.0,
+        "tipo_empleo": "Tiempo completo",
+        "estado": "Abierta"
+      },
+      "fecha_postulacion": "2026-09-28 10:00:00",
+      "estado": "En revisión",
+      "comentario": "Interesada en la vacante",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 2,
+      "usuario_id": 2,
+      "usuario": {
+        "id": 2,
+        "nombre": "Carlos",
+        "apellido": "Ramírez",
+        "correo": "carlos@correo.com"
+      },
+      "oferta_empleo_id": 2,
+      "oferta_empleo": {
+        "id": 2,
+        "titulo": "Albañil",
+        "empresa": "Constructora Occidente",
+        "ubicacion": "Zapopan",
+        "salario": 9500.0,
+        "tipo_empleo": "Por obra",
+        "estado": "Abierta"
+      },
+      "fecha_postulacion": "2026-09-30 12:00:00",
+      "estado": "Aceptada",
+      "comentario": "Cuenta con la experiencia requerida",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 3,
+      "usuario_id": 3,
+      "usuario": {
+        "id": 3,
+        "nombre": "María",
+        "apellido": "Torres",
+        "correo": "maria@correo.com"
+      },
+      "oferta_empleo_id": 3,
+      "oferta_empleo": {
+        "id": 3,
+        "titulo": "Diseñador gráfico",
+        "empresa": "Estudio Creativo",
+        "ubicacion": "Tlaquepaque",
+        "salario": 12000.0,
+        "tipo_empleo": "Medio tiempo",
+        "estado": "Cerrada"
+      },
+      "fecha_postulacion": "2026-10-01 09:30:00",
+      "estado": "Rechazada",
+      "comentario": "La vacante ya no está disponible",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    },
+    {
+      "id": 4,
+      "usuario_id": 3,
+      "usuario": {
+        "id": 3,
+        "nombre": "María",
+        "apellido": "Torres",
+        "correo": "maria@correo.com"
+      },
+      "oferta_empleo_id": 1,
+      "oferta_empleo": {
+        "id": 1,
+        "titulo": "Desarrollador web",
+        "empresa": "Tech Solutions",
+        "ubicacion": "Guadalajara",
+        "salario": 18000.0,
+        "tipo_empleo": "Tiempo completo",
+        "estado": "Abierta"
+      },
+      "fecha_postulacion": "2026-10-02 15:00:00",
+      "estado": "En revisión",
+      "comentario": "Interesada en el área de desarrollo",
+      "created_at": "2026-09-01 10:00:00",
+      "updated_at": "2026-09-01 10:00:00"
+    }
+  ]
+}

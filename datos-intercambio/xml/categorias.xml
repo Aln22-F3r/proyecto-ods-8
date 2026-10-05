@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<categorias>
+  <categoria>
+    <id>1</id>
+    <nombre>Tecnología</nombre>
+    <descripcion>Desarrollo de software, soporte y sistemas</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </categoria>
+  <categoria>
+    <id>2</id>
+    <nombre>Construcción</nombre>
+    <descripcion>Oficios y proyectos de construcción</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </categoria>
+  <categoria>
+    <id>3</id>
+    <nombre>Diseño</nombre>
+    <descripcion>Diseño gráfico, web y audiovisual</descripcion>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+  </categoria>
+</categorias>

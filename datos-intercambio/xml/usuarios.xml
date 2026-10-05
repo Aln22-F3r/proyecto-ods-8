@@ -1,0 +1,189 @@
+<?xml version='1.0' encoding='utf-8'?>
+<usuarios>
+  <usuario>
+    <id>1</id>
+    <rol_id>1</rol_id>
+    <rol>
+      <id>1</id>
+      <nombre>Administrador</nombre>
+      <descripcion>Acceso total al sistema</descripcion>
+    </rol>
+    <nombre>Ana</nombre>
+    <apellido>López</apellido>
+    <correo>ana@correo.com</correo>
+    <password>$2y$12$aBcDeFgHiJkLmNoPqRsTuOvWxYz0123456789AbCdEfGhIjKlMnOp1</password>
+    <telefono>3312345678</telefono>
+    <fecha_registro>2026-09-01 08:00:00</fecha_registro>
+    <estado>true</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+    <postulaciones>
+      <postulacion>
+        <id>1</id>
+        <oferta_empleo_id>1</oferta_empleo_id>
+        <oferta_empleo>
+          <id>1</id>
+          <titulo>Desarrollador web</titulo>
+          <empresa>Tech Solutions</empresa>
+          <ubicacion>Guadalajara</ubicacion>
+          <salario>18000.00</salario>
+          <tipo_empleo>Tiempo completo</tipo_empleo>
+          <estado>Abierta</estado>
+        </oferta_empleo>
+        <fecha_postulacion>2026-09-28 10:00:00</fecha_postulacion>
+        <estado>En revisión</estado>
+        <comentario>Interesada en la vacante</comentario>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </postulacion>
+    </postulaciones>
+    <lista_deseos>
+      <lista_deseo>
+        <id>1</id>
+        <oferta_empleo_id>2</oferta_empleo_id>
+        <oferta_empleo>
+          <id>2</id>
+          <titulo>Albañil</titulo>
+          <empresa>Constructora Occidente</empresa>
+          <ubicacion>Zapopan</ubicacion>
+          <salario>9500.00</salario>
+          <tipo_empleo>Por obra</tipo_empleo>
+          <estado>Abierta</estado>
+        </oferta_empleo>
+        <fecha_agregado>2026-09-25 18:00:00</fecha_agregado>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </lista_deseo>
+    </lista_deseos>
+  </usuario>
+  <usuario>
+    <id>2</id>
+    <rol_id>2</rol_id>
+    <rol>
+      <id>2</id>
+      <nombre>Empresa</nombre>
+      <descripcion>Publica y gestiona ofertas de empleo</descripcion>
+    </rol>
+    <nombre>Carlos</nombre>
+    <apellido>Ramírez</apellido>
+    <correo>carlos@correo.com</correo>
+    <password>$2y$12$bCdEfGhIjKlMnOpQrStUvWxYzA0123456789BcDeFgHiJkLmNoPqR2</password>
+    <telefono>3398765432</telefono>
+    <fecha_registro>2026-09-02 09:15:00</fecha_registro>
+    <estado>true</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+    <postulaciones>
+      <postulacion>
+        <id>2</id>
+        <oferta_empleo_id>2</oferta_empleo_id>
+        <oferta_empleo>
+          <id>2</id>
+          <titulo>Albañil</titulo>
+          <empresa>Constructora Occidente</empresa>
+          <ubicacion>Zapopan</ubicacion>
+          <salario>9500.00</salario>
+          <tipo_empleo>Por obra</tipo_empleo>
+          <estado>Abierta</estado>
+        </oferta_empleo>
+        <fecha_postulacion>2026-09-30 12:00:00</fecha_postulacion>
+        <estado>Aceptada</estado>
+        <comentario>Cuenta con la experiencia requerida</comentario>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </postulacion>
+    </postulaciones>
+    <lista_deseos>
+      <lista_deseo>
+        <id>3</id>
+        <oferta_empleo_id>3</oferta_empleo_id>
+        <oferta_empleo>
+          <id>3</id>
+          <titulo>Diseñador gráfico</titulo>
+          <empresa>Estudio Creativo</empresa>
+          <ubicacion>Tlaquepaque</ubicacion>
+          <salario>12000.00</salario>
+          <tipo_empleo>Medio tiempo</tipo_empleo>
+          <estado>Cerrada</estado>
+        </oferta_empleo>
+        <fecha_agregado>2026-09-27 08:45:00</fecha_agregado>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </lista_deseo>
+    </lista_deseos>
+  </usuario>
+  <usuario>
+    <id>3</id>
+    <rol_id>3</rol_id>
+    <rol>
+      <id>3</id>
+      <nombre>Candidato</nombre>
+      <descripcion>Busca y se postula a ofertas</descripcion>
+    </rol>
+    <nombre>María</nombre>
+    <apellido>Torres</apellido>
+    <correo>maria@correo.com</correo>
+    <password>$2y$12$cDeFgHiJkLmNoPqRsTuVwXyZaB0123456789CdEfGhIjKlMnOpQrS3</password>
+    <telefono>3355511122</telefono>
+    <fecha_registro>2026-09-03 10:30:00</fecha_registro>
+    <estado>true</estado>
+    <created_at>2026-09-01 10:00:00</created_at>
+    <updated_at>2026-09-01 10:00:00</updated_at>
+    <postulaciones>
+      <postulacion>
+        <id>3</id>
+        <oferta_empleo_id>3</oferta_empleo_id>
+        <oferta_empleo>
+          <id>3</id>
+          <titulo>Diseñador gráfico</titulo>
+          <empresa>Estudio Creativo</empresa>
+          <ubicacion>Tlaquepaque</ubicacion>
+          <salario>12000.00</salario>
+          <tipo_empleo>Medio tiempo</tipo_empleo>
+          <estado>Cerrada</estado>
+        </oferta_empleo>
+        <fecha_postulacion>2026-10-01 09:30:00</fecha_postulacion>
+        <estado>Rechazada</estado>
+        <comentario>La vacante ya no está disponible</comentario>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </postulacion>
+      <postulacion>
+        <id>4</id>
+        <oferta_empleo_id>1</oferta_empleo_id>
+        <oferta_empleo>
+          <id>1</id>
+          <titulo>Desarrollador web</titulo>
+          <empresa>Tech Solutions</empresa>
+          <ubicacion>Guadalajara</ubicacion>
+          <salario>18000.00</salario>
+          <tipo_empleo>Tiempo completo</tipo_empleo>
+          <estado>Abierta</estado>
+        </oferta_empleo>
+        <fecha_postulacion>2026-10-02 15:00:00</fecha_postulacion>
+        <estado>En revisión</estado>
+        <comentario>Interesada en el área de desarrollo</comentario>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </postulacion>
+    </postulaciones>
+    <lista_deseos>
+      <lista_deseo>
+        <id>2</id>
+        <oferta_empleo_id>1</oferta_empleo_id>
+        <oferta_empleo>
+          <id>1</id>
+          <titulo>Desarrollador web</titulo>
+          <empresa>Tech Solutions</empresa>
+          <ubicacion>Guadalajara</ubicacion>
+          <salario>18000.00</salario>
+          <tipo_empleo>Tiempo completo</tipo_empleo>
+          <estado>Abierta</estado>
+        </oferta_empleo>
+        <fecha_agregado>2026-09-26 20:15:00</fecha_agregado>
+        <created_at>2026-09-01 10:00:00</created_at>
+        <updated_at>2026-09-01 10:00:00</updated_at>
+      </lista_deseo>
+    </lista_deseos>
+  </usuario>
+</usuarios>
