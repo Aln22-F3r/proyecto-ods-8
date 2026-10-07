@@ -14,7 +14,8 @@ const modulos = [
 ];
 
 export default function AdminLayout({ children }) {
-    const { url } = usePage();
+    const { url, props } = usePage();
+    const flash = props.flash;
     const [abierto, setAbierto] = useState(false);
 
     const claseLink = (ruta) =>
@@ -81,7 +82,19 @@ export default function AdminLayout({ children }) {
 
             {/* ÁREA DE CONTENIDO + PIE DE PÁGINA */}
             <div className="flex flex-1 flex-col pt-14 md:ml-64">
-                <main className="flex-1 p-6">{children}</main>
+                <main className="flex-1 p-6">
+                    {flash?.exito && (
+                        <div className="mb-4 rounded border border-green-700 bg-green-900/40 p-3 text-sm text-white">
+                            {flash.exito}
+                        </div>
+                    )}
+                    {flash?.error && (
+                        <div className="mb-4 rounded border border-red-700 bg-red-900/40 p-3 text-sm text-white">
+                            {flash.error}
+                        </div>
+                    )}
+                    {children}
+                </main>
 
                 <footer className="bg-[#272020] p-3 text-center text-sm text-white">
                     © 2026 Panel Administrativo

@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Transaccion extends Model
 {
     protected $table = 'transacciones';
+    protected $fillable = [
+        'usuario_id',
+        'tipo_registro',
+        'descripcion',
+        'fecha',
+        'estado',
+    ];
 
     public function usuario(): BelongsTo
     {

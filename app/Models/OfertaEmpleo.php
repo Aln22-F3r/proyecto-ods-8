@@ -9,6 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class OfertaEmpleo extends Model
 {
     protected $table = 'ofertas_empleo';
+    protected $fillable = [
+        'categoria_id',
+        'titulo',
+        'empresa',
+        'descripcion',
+        'ubicacion',
+        'salario',
+        'tipo_empleo',
+        'fecha_publicacion',
+        'estado',
+        'logo',
+    ];
 
     public function categoria(): BelongsTo
     {

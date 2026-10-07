@@ -9,6 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Usuario extends Model
 {
+
+    protected $fillable = [
+        'rol_id',
+        'nombre',
+        'apellido',
+        'correo',
+        'password',
+        'telefono',
+        'fecha_registro',
+        'estado',
+    ];
+
     public function rol(): BelongsTo
     {
         return $this->belongsTo(Rol::class);

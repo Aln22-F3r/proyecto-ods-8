@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ListaDeseo extends Model
 {
     protected $table = 'lista_deseos';
+    protected $fillable = ['usuario_id', 'oferta_empleo_id', 'fecha_agregado'];
 
     public function usuario(): BelongsTo
     {

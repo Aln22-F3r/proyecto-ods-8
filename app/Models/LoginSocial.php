@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LoginSocial extends Model
 {
     protected $table = 'login_sociales';
+    protected $fillable = ['usuario_id', 'proveedor', 'proveedor_id', 'correo'];
 
     public function usuario(): BelongsTo
     {

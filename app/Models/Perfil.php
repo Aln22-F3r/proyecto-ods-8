@@ -8,6 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Perfil extends Model
 {
     protected $table = 'perfiles';
+    protected $fillable = [
+        'usuario_id',
+        'profesion_oficio',
+        'descripcion',
+        'experiencia',
+        'habilidades',
+        'ciudad',
+        'cv',
+        'foto',
+    ];
 
     public function usuario(): BelongsTo
     {
