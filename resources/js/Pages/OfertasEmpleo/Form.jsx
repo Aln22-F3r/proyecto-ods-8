@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -10,20 +11,38 @@ const errorClase = "mt-1 text-sm text-red-400";
 
 const tiposEmpleo = ["Tiempo completo", "Medio tiempo", "Por obra"];
 
-export default function Form({ categorias = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            categoria_id: "",
-            titulo: "",
-            empresa: "",
-            descripcion: "",
-            ubicacion: "",
-            salario: "",
-            tipo_empleo: "",
-            fecha_publicacion: "",
-            estado: "",
-            logo: null,
-        });
+const valoresIniciales = (oferta) => ({
+    categoria_id: oferta?.categoria_id ?? "",
+    titulo: oferta?.titulo ?? "",
+    empresa: oferta?.empresa ?? "",
+    descripcion: oferta?.descripcion ?? "",
+    ubicacion: oferta?.ubicacion ?? "",
+    salario: oferta?.salario ?? "",
+    tipo_empleo: oferta?.tipo_empleo ?? "",
+    fecha_publicacion: oferta?.fecha_publicacion ?? "",
+    estado: oferta?.estado ?? "",
+    logo: null,
+});
+
+export default function Form({ categorias = [], oferta = null }) {
+    const editando = oferta !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        transform,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(oferta));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(oferta));
+        clearErrors();
+    }, [oferta?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -60,7 +79,7 @@ export default function Form({ categorias = [] }) {
             nuevos.ubicacion = "La ubicación debe tener al menos 3 caracteres.";
         }
 
-        if (data.salario === "") {
+        if (data.salario === "" || data.salario === null) {
             nuevos.salario = "El salario es obligatorio.";
         } else if (isNaN(Number(data.salario))) {
             nuevos.salario = "El salario debe ser un número.";
@@ -85,6 +104,7 @@ export default function Form({ categorias = [] }) {
             nuevos.estado = "Selecciona un estado.";
         }
 
+        // El logo es opcional; si se elige uno, debe cumplir tipo y tamaño //
         if (data.logo) {
             if (!/\.(jpg|jpeg|png|webp)$/i.test(data.logo.name)) {
                 nuevos.logo = "El logo debe ser de tipo jpg, jpeg, png o webp.";
@@ -98,16 +118,25 @@ export default function Form({ categorias = [] }) {
             return;
         }
 
-        post("/ofertas-empleo");
+        if (editando) {
+            transform((datos) => ({ ...datos, _method: "put" }));
+            post(`/ofertas-empleo/${oferta.id}`, { forceFormData: true });
+        } else {
+            transform((datos) => datos);
+            post("/ofertas-empleo", { forceFormData: true });
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de oferta de empleo
+                {editando
+                    ? "Editar oferta de empleo"
+                    : "Formulario de oferta de empleo"}
             </h1>
 
             <form
+                key={oferta?.id ?? "nuevo"}
                 onSubmit={enviar}
                 noValidate
                 className="mt-6 max-w-xl space-y-4 rounded border border-[#4a4141] bg-[#272020] p-6"
@@ -260,6 +289,7 @@ export default function Form({ categorias = [] }) {
                     <input
                         id="fecha_publicacion"
                         type="datetime-local"
+                        step="1"
                         value={data.fecha_publicacion}
                         onChange={(e) =>
                             setData("fecha_publicacion", e.target.value)
@@ -294,6 +324,18 @@ export default function Form({ categorias = [] }) {
                     <label htmlFor="logo" className={labelClase}>
                         Logo de la empresa (jpg, png o webp, máximo 2 MB)
                     </label>
+                    {editando && oferta.logo && (
+                        <div className="mb-2">
+                            <img
+                                src={oferta.logo}
+                                alt="Logo actual"
+                                className="h-24 w-24 rounded object-contain"
+                            />
+                            <p className="mt-1 text-sm text-white/80">
+                                Si no eliges uno nuevo, se conserva este.
+                            </p>
+                        </div>
+                    )}
                     <input
                         id="logo"
                         type="file"
@@ -312,7 +354,7 @@ export default function Form({ categorias = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/ofertas-empleo"

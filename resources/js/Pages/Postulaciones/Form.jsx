@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -6,15 +7,37 @@ const inputClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form({ usuarios = [], ofertas = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            usuario_id: "",
-            oferta_empleo_id: "",
-            fecha_postulacion: "",
-            estado: "",
-            comentario: "",
-        });
+const valoresIniciales = (postulacion) => ({
+    usuario_id: postulacion?.usuario_id ?? "",
+    oferta_empleo_id: postulacion?.oferta_empleo_id ?? "",
+    fecha_postulacion: postulacion?.fecha_postulacion ?? "",
+    estado: postulacion?.estado ?? "",
+    comentario: postulacion?.comentario ?? "",
+});
+
+export default function Form({
+    usuarios = [],
+    ofertas = [],
+    postulacion = null,
+}) {
+    const editando = postulacion !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(postulacion));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(postulacion));
+        clearErrors();
+    }, [postulacion?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -56,13 +79,17 @@ export default function Form({ usuarios = [], ofertas = [] }) {
             return;
         }
 
-        post("/postulaciones");
+        if (editando) {
+            put(`/postulaciones/${postulacion.id}`);
+        } else {
+            post("/postulaciones");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de postulación
+                {editando ? "Editar postulación" : "Formulario de postulación"}
             </h1>
 
             <form
@@ -129,6 +156,7 @@ export default function Form({ usuarios = [], ofertas = [] }) {
                     <input
                         id="fecha_postulacion"
                         type="datetime-local"
+                        step="1"
                         value={data.fecha_postulacion}
                         onChange={(e) =>
                             setData("fecha_postulacion", e.target.value)
@@ -183,7 +211,7 @@ export default function Form({ usuarios = [], ofertas = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/postulaciones"

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -6,14 +7,32 @@ const inputClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form({ usuarios = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            usuario_id: "",
-            proveedor: "",
-            proveedor_id: "",
-            correo: "",
-        });
+const valoresIniciales = (loginSocial) => ({
+    usuario_id: loginSocial?.usuario_id ?? "",
+    proveedor: loginSocial?.proveedor ?? "",
+    proveedor_id: loginSocial?.proveedor_id ?? "",
+    correo: loginSocial?.correo ?? "",
+});
+
+export default function Form({ usuarios = [], loginSocial = null }) {
+    const editando = loginSocial !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(loginSocial));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(loginSocial));
+        clearErrors();
+    }, [loginSocial?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -47,13 +66,19 @@ export default function Form({ usuarios = [] }) {
             return;
         }
 
-        post("/login-sociales");
+        if (editando) {
+            put(`/login-sociales/${loginSocial.id}`);
+        } else {
+            post("/login-sociales");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de login social
+                {editando
+                    ? "Editar login social"
+                    : "Formulario de login social"}
             </h1>
 
             <form
@@ -151,7 +176,7 @@ export default function Form({ usuarios = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/login-sociales"

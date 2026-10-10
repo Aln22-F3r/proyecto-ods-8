@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -13,14 +14,32 @@ const esIpv4 = (valor) =>
 const esIpv6 = (valor) =>
     /^[0-9a-fA-F:]+$/.test(valor) && (valor.match(/:/g) || []).length >= 2;
 
-export default function Form({ usuarios = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            usuario_id: "",
-            accion: "",
-            fecha: "",
-            ip: "",
-        });
+const valoresIniciales = (log) => ({
+    usuario_id: log?.usuario_id ?? "",
+    accion: log?.accion ?? "",
+    fecha: log?.fecha ?? "",
+    ip: log?.ip ?? "",
+});
+
+export default function Form({ usuarios = [], log = null }) {
+    const editando = log !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(log));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(log));
+        clearErrors();
+    }, [log?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -56,13 +75,17 @@ export default function Form({ usuarios = [] }) {
             return;
         }
 
-        post("/logs");
+        if (editando) {
+            put(`/logs/${log.id}`);
+        } else {
+            post("/logs");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de log
+                {editando ? "Editar log" : "Formulario de log"}
             </h1>
 
             <form
@@ -122,6 +145,7 @@ export default function Form({ usuarios = [] }) {
                     <input
                         id="fecha"
                         type="datetime-local"
+                        step="1"
                         value={data.fecha}
                         onChange={(e) => setData("fecha", e.target.value)}
                         className={inputClase}
@@ -152,7 +176,7 @@ export default function Form({ usuarios = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/logs"

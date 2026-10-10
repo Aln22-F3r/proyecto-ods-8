@@ -88,6 +88,11 @@ export default function AdminLayout({ children }) {
                             {flash.exito}
                         </div>
                     )}
+                    {flash?.advertencia && (
+                        <div className="mb-4 rounded border border-yellow-700 bg-yellow-900/40 p-3 text-sm text-white">
+                            {flash.advertencia}
+                        </div>
+                    )}
                     {flash?.error && (
                         <div className="mb-4 rounded border border-red-700 bg-red-900/40 p-3 text-sm text-white">
                             {flash.error}

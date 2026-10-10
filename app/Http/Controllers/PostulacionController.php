@@ -25,20 +25,95 @@ class PostulacionController extends Controller
     public function create()
     {
         return Inertia::render('Postulaciones/Form', [
-            'usuarios' => Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get(),
-            'ofertas' => OfertaEmpleo::select('id', 'titulo', 'empresa')->orderBy('titulo')->get(),
+            'usuarios' => $this->usuarios(),
+            'ofertas' => $this->ofertas(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $datos = $request->validate([
+        $datos = $this->validar($request);
+
+        $datos['fecha_postulacion'] = Carbon::parse($datos['fecha_postulacion'])->format('Y-m-d H:i:s');
+
+        try {
+            Postulacion::create($datos);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo guardar la postulación. Intenta de nuevo.');
+        }
+
+        return redirect('/postulaciones')->with('exito', 'Postulación creada correctamente.');
+    }
+
+    public function edit($id)
+    {
+        $postulacion = Postulacion::find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones')->with('error', 'La postulación solicitada no existe. No se puede editar.');
+        }
+
+        return Inertia::render('Postulaciones/Form', [
+            'postulacion' => [
+                'id' => $postulacion->id,
+                'usuario_id' => $postulacion->usuario_id,
+                'oferta_empleo_id' => $postulacion->oferta_empleo_id,
+                'fecha_postulacion' => Carbon::parse($postulacion->fecha_postulacion)->format('Y-m-d\TH:i:s'),
+                'estado' => $postulacion->estado,
+                'comentario' => $postulacion->comentario,
+            ],
+            'usuarios' => $this->usuarios(),
+            'ofertas' => $this->ofertas(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $postulacion = Postulacion::find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones')->with('error', 'La postulación solicitada no existe. No se puede actualizar.');
+        }
+
+        $datos = $this->validar($request, $postulacion->id);
+
+        $datos['fecha_postulacion'] = Carbon::parse($datos['fecha_postulacion'])->format('Y-m-d H:i:s');
+
+        $postulacion->fill($datos);
+
+        if (!$postulacion->isDirty()) {
+            return redirect('/postulaciones')->with('advertencia', 'No se realizaron cambios en la postulación.');
+        }
+
+        try {
+            $postulacion->save();
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo actualizar la postulación. Intenta de nuevo.');
+        }
+
+        return redirect('/postulaciones')->with('exito', 'Postulación actualizada correctamente.');
+    }
+
+    private function usuarios()
+    {
+        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
+    }
+
+    private function ofertas()
+    {
+        return OfertaEmpleo::select('id', 'titulo', 'empresa')->orderBy('titulo')->get();
+    }
+
+    private function validar(Request $request, $id = null): array
+    {
+        return $request->validate([
             'usuario_id' => ['required', 'exists:usuarios,id'],
             'oferta_empleo_id' => [
                 'required',
                 'exists:ofertas_empleo,id',
                 Rule::unique('postulaciones', 'oferta_empleo_id')
-                    ->where('usuario_id', $request->input('usuario_id')),
+                    ->where('usuario_id', $request->input('usuario_id'))
+                    ->ignore($id),
             ],
             'fecha_postulacion' => ['required', 'date'],
             'estado' => ['required', 'in:En revisión,Aceptada,Rechazada'],
@@ -58,15 +133,5 @@ class PostulacionController extends Controller
             'oferta_empleo_id' => 'oferta de empleo',
             'fecha_postulacion' => 'fecha de postulación',
         ]);
-
-        $datos['fecha_postulacion'] = Carbon::parse($datos['fecha_postulacion'])->format('Y-m-d H:i:s');
-
-        try {
-            Postulacion::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar la postulación. Intenta de nuevo.');
-        }
-
-        return redirect('/postulaciones')->with('exito', 'Postulación creada correctamente.');
     }
 }

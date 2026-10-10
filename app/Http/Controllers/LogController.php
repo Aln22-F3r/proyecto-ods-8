@@ -20,13 +20,80 @@ class LogController extends Controller
     public function create()
     {
         return Inertia::render('Logs/Form', [
-            'usuarios' => Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get(),
+            'usuarios' => $this->usuarios(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $datos = $request->validate([
+        $datos = $this->validar($request);
+
+        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+
+        try {
+            Log::create($datos);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo guardar el log. Intenta de nuevo.');
+        }
+
+        return redirect('/logs')->with('exito', 'Log creado correctamente.');
+    }
+
+    public function edit($id)
+    {
+        $log = Log::find($id);
+
+        if (!$log) {
+            return redirect('/logs')->with('error', 'El log solicitado no existe. No se puede editar.');
+        }
+
+        return Inertia::render('Logs/Form', [
+            'log' => [
+                'id' => $log->id,
+                'usuario_id' => $log->usuario_id,
+                'accion' => $log->accion,
+                'fecha' => Carbon::parse($log->fecha)->format('Y-m-d\TH:i:s'),
+                'ip' => $log->ip,
+            ],
+            'usuarios' => $this->usuarios(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $log = Log::find($id);
+
+        if (!$log) {
+            return redirect('/logs')->with('error', 'El log solicitado no existe. No se puede actualizar.');
+        }
+
+        $datos = $this->validar($request);
+
+        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+
+        $log->fill($datos);
+
+        if (!$log->isDirty()) {
+            return redirect('/logs')->with('advertencia', 'No se realizaron cambios en el log.');
+        }
+
+        try {
+            $log->save();
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo actualizar el log. Intenta de nuevo.');
+        }
+
+        return redirect('/logs')->with('exito', 'Log actualizado correctamente.');
+    }
+
+    private function usuarios()
+    {
+        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
+    }
+
+    private function validar(Request $request): array
+    {
+        return $request->validate([
             'usuario_id' => ['required', 'exists:usuarios,id'],
             'accion' => ['required', 'string', 'min:3', 'max:255'],
             'fecha' => ['required', 'date'],
@@ -44,15 +111,5 @@ class LogController extends Controller
             'accion' => 'acción',
             'ip' => 'IP',
         ]);
-
-        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
-
-        try {
-            Log::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar el log. Intenta de nuevo.');
-        }
-
-        return redirect('/logs')->with('exito', 'Log creado correctamente.');
     }
 }

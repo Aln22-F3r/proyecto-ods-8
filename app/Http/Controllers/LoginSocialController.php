@@ -20,13 +20,76 @@ class LoginSocialController extends Controller
     public function create()
     {
         return Inertia::render('LoginSociales/Form', [
-            'usuarios' => Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get(),
+            'usuarios' => $this->usuarios(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $datos = $request->validate([
+        $datos = $this->validar($request);
+
+        try {
+            LoginSocial::create($datos);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo guardar el login social. Intenta de nuevo.');
+        }
+
+        return redirect('/login-sociales')->with('exito', 'Login social creado correctamente.');
+    }
+
+    public function edit($id)
+    {
+        $loginSocial = LoginSocial::find($id);
+
+        if (!$loginSocial) {
+            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe. No se puede editar.');
+        }
+
+        return Inertia::render('LoginSociales/Form', [
+            'loginSocial' => [
+                'id' => $loginSocial->id,
+                'usuario_id' => $loginSocial->usuario_id,
+                'proveedor' => $loginSocial->proveedor,
+                'proveedor_id' => $loginSocial->proveedor_id,
+                'correo' => $loginSocial->correo,
+            ],
+            'usuarios' => $this->usuarios(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $loginSocial = LoginSocial::find($id);
+
+        if (!$loginSocial) {
+            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe. No se puede actualizar.');
+        }
+
+        $datos = $this->validar($request, $loginSocial->id);
+
+        $loginSocial->fill($datos);
+
+        if (!$loginSocial->isDirty()) {
+            return redirect('/login-sociales')->with('advertencia', 'No se realizaron cambios en el login social.');
+        }
+
+        try {
+            $loginSocial->save();
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo actualizar el login social. Intenta de nuevo.');
+        }
+
+        return redirect('/login-sociales')->with('exito', 'Login social actualizado correctamente.');
+    }
+
+    private function usuarios()
+    {
+        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
+    }
+
+    private function validar(Request $request, $id = null): array
+    {
+        return $request->validate([
             'usuario_id' => ['required', 'exists:usuarios,id'],
             'proveedor' => ['required', 'in:Google,Facebook,GitHub'],
             'proveedor_id' => [
@@ -35,7 +98,8 @@ class LoginSocialController extends Controller
                 'min:3',
                 'max:255',
                 Rule::unique('login_sociales', 'proveedor_id')
-                    ->where('proveedor', $request->input('proveedor')),
+                    ->where('proveedor', $request->input('proveedor'))
+                    ->ignore($id),
             ],
             'correo' => ['required', 'email', 'max:150'],
         ], [
@@ -52,13 +116,5 @@ class LoginSocialController extends Controller
             'proveedor_id' => 'ID del proveedor',
             'correo' => 'correo',
         ]);
-
-        try {
-            LoginSocial::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar el login social. Intenta de nuevo.');
-        }
-
-        return redirect('/login-sociales')->with('exito', 'Login social creado correctamente.');
     }
 }

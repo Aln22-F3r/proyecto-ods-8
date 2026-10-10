@@ -22,6 +22,10 @@ class OfertaEmpleo extends Model
         'logo',
     ];
 
+    protected $casts = [
+        'salario' => 'decimal:2',
+    ];
+
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(Categoria::class);

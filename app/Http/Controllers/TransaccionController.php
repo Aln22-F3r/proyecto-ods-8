@@ -20,13 +20,81 @@ class TransaccionController extends Controller
     public function create()
     {
         return Inertia::render('Transacciones/Form', [
-            'usuarios' => Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get(),
+            'usuarios' => $this->usuarios(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $datos = $request->validate([
+        $datos = $this->validar($request);
+
+        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+
+        try {
+            Transaccion::create($datos);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo guardar la transacción. Intenta de nuevo.');
+        }
+
+        return redirect('/transacciones')->with('exito', 'Transacción creada correctamente.');
+    }
+
+    public function edit($id)
+    {
+        $transaccion = Transaccion::find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe. No se puede editar.');
+        }
+
+        return Inertia::render('Transacciones/Form', [
+            'transaccion' => [
+                'id' => $transaccion->id,
+                'usuario_id' => $transaccion->usuario_id,
+                'tipo_registro' => $transaccion->tipo_registro,
+                'descripcion' => $transaccion->descripcion,
+                'fecha' => Carbon::parse($transaccion->fecha)->format('Y-m-d\TH:i:s'),
+                'estado' => $transaccion->estado,
+            ],
+            'usuarios' => $this->usuarios(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $transaccion = Transaccion::find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe. No se puede actualizar.');
+        }
+
+        $datos = $this->validar($request);
+
+        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+
+        $transaccion->fill($datos);
+
+        if (!$transaccion->isDirty()) {
+            return redirect('/transacciones')->with('advertencia', 'No se realizaron cambios en la transacción.');
+        }
+
+        try {
+            $transaccion->save();
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo actualizar la transacción. Intenta de nuevo.');
+        }
+
+        return redirect('/transacciones')->with('exito', 'Transacción actualizada correctamente.');
+    }
+
+    private function usuarios()
+    {
+        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
+    }
+
+    private function validar(Request $request): array
+    {
+        return $request->validate([
             'usuario_id' => ['required', 'exists:usuarios,id'],
             'tipo_registro' => ['required', 'in:Registro,Publicación,Postulación'],
             'descripcion' => ['required', 'string', 'min:5', 'max:255'],
@@ -45,15 +113,5 @@ class TransaccionController extends Controller
             'tipo_registro' => 'tipo de registro',
             'descripcion' => 'descripción',
         ]);
-
-        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
-
-        try {
-            Transaccion::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar la transacción. Intenta de nuevo.');
-        }
-
-        return redirect('/transacciones')->with('exito', 'Transacción creada correctamente.');
     }
 }

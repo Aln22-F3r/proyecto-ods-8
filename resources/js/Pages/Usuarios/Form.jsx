@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -6,18 +7,36 @@ const inputClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form({ roles = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            rol_id: "",
-            nombre: "",
-            apellido: "",
-            correo: "",
-            password: "",
-            telefono: "",
-            fecha_registro: "",
-            estado: true,
-        });
+const valoresIniciales = (usuario) => ({
+    rol_id: usuario?.rol_id ?? "",
+    nombre: usuario?.nombre ?? "",
+    apellido: usuario?.apellido ?? "",
+    correo: usuario?.correo ?? "",
+    password: "",
+    telefono: usuario?.telefono ?? "",
+    fecha_registro: usuario?.fecha_registro ?? "",
+    estado: usuario ? Boolean(usuario.estado) : true,
+});
+
+export default function Form({ roles = [], usuario = null }) {
+    const editando = usuario !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(usuario));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(usuario));
+        clearErrors();
+    }, [usuario?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -47,9 +66,10 @@ export default function Form({ roles = [] }) {
             nuevos.correo = "El correo no tiene un formato válido.";
         }
 
-        if (!data.password) {
+        // Al editar la contraseña es opcional; si se escribe, debe cumplir el mínimo
+        if (!editando && !data.password) {
             nuevos.password = "La contraseña es obligatoria.";
-        } else if (data.password.length < 8) {
+        } else if (data.password && data.password.length < 8) {
             nuevos.password = "La contraseña debe tener al menos 8 caracteres.";
         }
 
@@ -71,13 +91,17 @@ export default function Form({ roles = [] }) {
             return;
         }
 
-        post("/usuarios");
+        if (editando) {
+            put(`/usuarios/${usuario.id}`);
+        } else {
+            post("/usuarios");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de usuario
+                {editando ? "Editar usuario" : "Formulario de usuario"}
             </h1>
 
             <form
@@ -166,12 +190,15 @@ export default function Form({ roles = [] }) {
 
                 <div>
                     <label htmlFor="password" className={labelClase}>
-                        Contraseña
+                        {editando
+                            ? "Contraseña (déjala vacía para conservar la actual)"
+                            : "Contraseña"}
                     </label>
                     <input
                         id="password"
                         type="password"
                         maxLength={255}
+                        autoComplete="new-password"
                         value={data.password}
                         onChange={(e) => setData("password", e.target.value)}
                         className={inputClase}
@@ -205,6 +232,7 @@ export default function Form({ roles = [] }) {
                     <input
                         id="fecha_registro"
                         type="datetime-local"
+                        step="1"
                         value={data.fecha_registro}
                         onChange={(e) =>
                             setData("fecha_registro", e.target.value)
@@ -245,7 +273,7 @@ export default function Form({ roles = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/usuarios"

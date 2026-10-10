@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -6,12 +7,31 @@ const inputClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form() {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            nombre: "",
-            descripcion: "",
+export default function Form({ rol = null }) {
+    const editando = rol !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm({
+        nombre: rol?.nombre ?? "",
+        descripcion: rol?.descripcion ?? "",
+    });
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData({
+            nombre: rol?.nombre ?? "",
+            descripcion: rol?.descripcion ?? "",
         });
+        clearErrors();
+    }, [rol?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -37,13 +57,17 @@ export default function Form() {
             return;
         }
 
-        post("/roles");
+        if (editando) {
+            put(`/roles/${rol.id}`);
+        } else {
+            post("/roles");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de rol
+                {editando ? "Editar rol" : "Formulario de rol"}
             </h1>
 
             <form
@@ -97,7 +121,7 @@ export default function Form() {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/roles"

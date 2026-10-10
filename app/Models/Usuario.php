@@ -21,6 +21,10 @@ class Usuario extends Model
         'estado',
     ];
 
+    protected $casts = [
+        'estado' => 'boolean',
+    ];
+
     public function rol(): BelongsTo
     {
         return $this->belongsTo(Rol::class);

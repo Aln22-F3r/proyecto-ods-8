@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -8,18 +9,36 @@ const archivoClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form({ usuarios = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            usuario_id: "",
-            profesion_oficio: "",
-            descripcion: "",
-            experiencia: "",
-            habilidades: "",
-            ciudad: "",
-            cv: null,
-            foto: null,
-        });
+const valoresIniciales = (perfil) => ({
+    usuario_id: perfil?.usuario_id ?? "",
+    profesion_oficio: perfil?.profesion_oficio ?? "",
+    descripcion: perfil?.descripcion ?? "",
+    experiencia: perfil?.experiencia ?? "",
+    habilidades: perfil?.habilidades ?? "",
+    ciudad: perfil?.ciudad ?? "",
+    cv: null,
+    foto: null,
+});
+
+export default function Form({ usuarios = [], perfil = null }) {
+    const editando = perfil !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        transform,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(perfil));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(perfil));
+        clearErrors();
+    }, [perfil?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -45,7 +64,7 @@ export default function Form({ usuarios = [] }) {
                 "La descripción debe tener al menos 10 caracteres.";
         }
 
-        if (data.experiencia === "") {
+        if (data.experiencia === "" || data.experiencia === null) {
             nuevos.experiencia = "La experiencia es obligatoria.";
         } else if (!/^[0-9]+$/.test(String(data.experiencia))) {
             nuevos.experiencia = "La experiencia debe ser un número entero.";
@@ -66,8 +85,11 @@ export default function Form({ usuarios = [] }) {
             nuevos.ciudad = "La ciudad debe tener al menos 2 caracteres.";
         }
 
+        // El CV es obligatorio solo al crear; al editar, si no se elige, se conserva el actual //
         if (!data.cv) {
-            nuevos.cv = "El CV es obligatorio.";
+            if (!editando) {
+                nuevos.cv = "El CV es obligatorio.";
+            }
         } else if (!/\.(pdf|doc|docx)$/i.test(data.cv.name)) {
             nuevos.cv =
                 "El CV debe ser un archivo PDF o Word (pdf, doc, docx).";
@@ -88,16 +110,23 @@ export default function Form({ usuarios = [] }) {
             return;
         }
 
-        post("/perfiles");
+        if (editando) {
+            transform((datos) => ({ ...datos, _method: "put" }));
+            post(`/perfiles/${perfil.id}`, { forceFormData: true });
+        } else {
+            transform((datos) => datos);
+            post("/perfiles", { forceFormData: true });
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de perfil
+                {editando ? "Editar perfil" : "Formulario de perfil"}
             </h1>
 
             <form
+                key={perfil?.id ?? "nuevo"}
                 onSubmit={enviar}
                 noValidate
                 className="mt-6 max-w-xl space-y-4 rounded border border-[#4a4141] bg-[#272020] p-6"
@@ -220,6 +249,20 @@ export default function Form({ usuarios = [] }) {
                     <label htmlFor="cv" className={labelClase}>
                         CV (PDF o Word, máximo 5 MB)
                     </label>
+                    {editando && perfil.cv && (
+                        <p className="mb-2 text-sm text-white/80">
+                            CV actual:{" "}
+                            <a
+                                href={perfil.cv}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline"
+                            >
+                                ver archivo
+                            </a>
+                            . Si no eliges uno nuevo, se conserva.
+                        </p>
+                    )}
                     <input
                         id="cv"
                         type="file"
@@ -236,6 +279,18 @@ export default function Form({ usuarios = [] }) {
                     <label htmlFor="foto" className={labelClase}>
                         Foto de perfil (jpg, png o webp, máximo 2 MB)
                     </label>
+                    {editando && perfil.foto && (
+                        <div className="mb-2">
+                            <img
+                                src={perfil.foto}
+                                alt="Foto actual"
+                                className="h-24 w-24 rounded object-cover"
+                            />
+                            <p className="mt-1 text-sm text-white/80">
+                                Si no eliges una nueva, se conserva esta.
+                            </p>
+                        </div>
+                    )}
                     <input
                         id="foto"
                         type="file"
@@ -254,7 +309,7 @@ export default function Form({ usuarios = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/perfiles"

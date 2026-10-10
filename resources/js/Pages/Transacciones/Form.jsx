@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useForm } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -6,15 +7,33 @@ const inputClase =
 const labelClase = "mb-1 block text-sm font-medium text-white";
 const errorClase = "mt-1 text-sm text-red-400";
 
-export default function Form({ usuarios = [] }) {
-    const { data, setData, post, processing, errors, setError, clearErrors } =
-        useForm({
-            usuario_id: "",
-            tipo_registro: "",
-            descripcion: "",
-            fecha: "",
-            estado: "",
-        });
+const valoresIniciales = (transaccion) => ({
+    usuario_id: transaccion?.usuario_id ?? "",
+    tipo_registro: transaccion?.tipo_registro ?? "",
+    descripcion: transaccion?.descripcion ?? "",
+    fecha: transaccion?.fecha ?? "",
+    estado: transaccion?.estado ?? "",
+});
+
+export default function Form({ usuarios = [], transaccion = null }) {
+    const editando = transaccion !== null;
+
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        setError,
+        clearErrors,
+    } = useForm(valoresIniciales(transaccion));
+
+    // Al pasar de crear a editar (o entre registros) se recargan los campos //
+    useEffect(() => {
+        setData(valoresIniciales(transaccion));
+        clearErrors();
+    }, [transaccion?.id]);
 
     const enviar = (e) => {
         e.preventDefault();
@@ -52,13 +71,17 @@ export default function Form({ usuarios = [] }) {
             return;
         }
 
-        post("/transacciones");
+        if (editando) {
+            put(`/transacciones/${transaccion.id}`);
+        } else {
+            post("/transacciones");
+        }
     };
 
     return (
         <AdminLayout>
             <h1 className="text-2xl font-semibold text-white">
-                Formulario de transacción
+                {editando ? "Editar transacción" : "Formulario de transacción"}
             </h1>
 
             <form
@@ -140,6 +163,7 @@ export default function Form({ usuarios = [] }) {
                     <input
                         id="fecha"
                         type="datetime-local"
+                        step="1"
                         value={data.fecha}
                         onChange={(e) => setData("fecha", e.target.value)}
                         className={inputClase}
@@ -174,7 +198,7 @@ export default function Form({ usuarios = [] }) {
                         disabled={processing}
                         className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80 disabled:opacity-50"
                     >
-                        Guardar
+                        {editando ? "Actualizar" : "Guardar"}
                     </button>
                     <Link
                         href="/transacciones"
