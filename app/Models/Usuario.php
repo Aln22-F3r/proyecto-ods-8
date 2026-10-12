@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Usuario extends Model
 {
+    use SoftDeletes;
 
     protected $fillable = [
         'rol_id',
@@ -27,7 +29,7 @@ class Usuario extends Model
 
     public function rol(): BelongsTo
     {
-        return $this->belongsTo(Rol::class);
+        return $this->belongsTo(Rol::class)->withTrashed();
     }
 
     public function perfil(): HasOne

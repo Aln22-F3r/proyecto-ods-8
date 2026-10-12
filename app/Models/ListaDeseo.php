@@ -12,11 +12,11 @@ class ListaDeseo extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class);
+        return $this->belongsTo(Usuario::class)->withTrashed();
     }
 
     public function ofertaEmpleo(): BelongsTo
     {
-        return $this->belongsTo(OfertaEmpleo::class);
+        return $this->belongsTo(OfertaEmpleo::class)->withTrashed();
     }
 }

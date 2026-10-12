@@ -16,6 +16,52 @@ class UsuarioController extends Controller
     {
         return Inertia::render('Usuarios/Index', [
             'usuarios' => Usuario::with('rol:id,nombre')->paginate(5),
+            'eliminados' => false,
+        ]);
+    }
+
+    public function eliminados()
+    {
+        return Inertia::render('Usuarios/Index', [
+            'usuarios' => Usuario::onlyTrashed()->with('rol:id,nombre')->paginate(5),
+            'eliminados' => true,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $usuario = Usuario::withTrashed()
+            ->with('rol:id,nombre')
+            ->withCount(['postulaciones', 'listaDeseos', 'transacciones', 'loginSociales', 'logs'])
+            ->find($id);
+
+        if (!$usuario) {
+            return redirect('/usuarios')->with('error', 'El usuario solicitado no existe.');
+        }
+
+        $zona = 'America/Mexico_City';
+
+        return Inertia::render('Usuarios/Show', [
+            'usuario' => [
+                'id' => $usuario->id,
+                'rol' => $usuario->rol?->nombre,
+                'nombre' => $usuario->nombre,
+                'apellido' => $usuario->apellido,
+                'correo' => $usuario->correo,
+                'telefono' => $usuario->telefono,
+                'fecha_registro' => Carbon::parse($usuario->fecha_registro)->format('d/m/Y H:i'),
+                'estado' => $usuario->estado,
+                'perfil' => $usuario->perfil?->profesion_oficio,
+                'postulaciones_count' => $usuario->postulaciones_count,
+                'lista_deseos_count' => $usuario->lista_deseos_count,
+                'transacciones_count' => $usuario->transacciones_count,
+                'login_sociales_count' => $usuario->login_sociales_count,
+                'logs_count' => $usuario->logs_count,
+                'creado' => $usuario->created_at?->timezone($zona)->format('d/m/Y H:i'),
+                'actualizado' => $usuario->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'eliminado' => $usuario->trashed(),
+                'fecha_eliminacion' => $usuario->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+            ],
         ]);
     }
 
@@ -61,7 +107,14 @@ class UsuarioController extends Controller
                 'fecha_registro' => Carbon::parse($usuario->fecha_registro)->format('Y-m-d\TH:i:s'),
                 'estado' => $usuario->estado,
             ],
-            'roles' => $this->roles(),
+            // Roles activos, más el rol actual del usuario aunque esté eliminado, para que no desaparezca del select //
+            'roles' => Rol::withTrashed()
+                ->where(function ($q) use ($usuario) {
+                    $q->whereNull('deleted_at')->orWhere('id', $usuario->rol_id);
+                })
+                ->select('id', 'nombre')
+                ->orderBy('nombre')
+                ->get(),
         ]);
     }
 
@@ -97,6 +150,85 @@ class UsuarioController extends Controller
         }
 
         return redirect('/usuarios')->with('exito', 'Usuario actualizado correctamente.');
+    }
+
+    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    public function destroy($id)
+    {
+        $usuario = Usuario::find($id);
+
+        if (!$usuario) {
+            return redirect('/usuarios')->with('error', 'El usuario solicitado no existe o ya fue eliminado.');
+        }
+
+        try {
+            $usuario->delete();
+        } catch (\Throwable $e) {
+            return redirect('/usuarios')->with('error', 'No se pudo eliminar el usuario. Intenta de nuevo.');
+        }
+
+        return redirect('/usuarios')->with('exito', "El usuario «{$usuario->nombre} {$usuario->apellido}» se eliminó. Puedes restaurarlo desde la lista de eliminados.");
+    }
+
+    public function restore($id)
+    {
+        $usuario = Usuario::onlyTrashed()->find($id);
+
+        if (!$usuario) {
+            return redirect('/usuarios/eliminados')->with('error', 'El usuario solicitado no existe o no está eliminado.');
+        }
+
+        try {
+            $usuario->restore();
+        } catch (\Throwable $e) {
+            return redirect('/usuarios/eliminados')->with('error', 'No se pudo restaurar el usuario. Intenta de nuevo.');
+        }
+
+        return redirect('/usuarios/eliminados')->with('exito', "El usuario «{$usuario->nombre} {$usuario->apellido}» se restauró y ya aparece en la lista principal.");
+    }
+
+    // Borrado físico: solo para registros ya eliminados y sin dependencias //
+    public function forceDelete($id)
+    {
+        $usuario = Usuario::withTrashed()->find($id);
+
+        if (!$usuario) {
+            return redirect('/usuarios/eliminados')->with('error', 'El usuario solicitado no existe.');
+        }
+
+        if (!$usuario->trashed()) {
+            return redirect('/usuarios')->with('advertencia', 'El usuario debe eliminarse primero (borrado lógico) antes de poder borrarlo definitivamente.');
+        }
+
+        // Se cuentan también los registros eliminados lógicamente, porque siguen apuntando al usuario en la base de datos. //
+        // La lista de deseos no tiene borrado lógico, por eso se cuenta sin withTrashed(). //
+        $dependencias = [
+            'perfil' => [$usuario->perfil()->withTrashed()->count(), 'perfil', 'perfiles'],
+            'postulaciones' => [$usuario->postulaciones()->withTrashed()->count(), 'postulación', 'postulaciones'],
+            'lista de deseos' => [$usuario->listaDeseos()->count(), 'elemento en la lista de deseos', 'elementos en la lista de deseos'],
+            'transacciones' => [$usuario->transacciones()->withTrashed()->count(), 'transacción', 'transacciones'],
+            'login sociales' => [$usuario->loginSociales()->withTrashed()->count(), 'login social', 'login sociales'],
+            'logs' => [$usuario->logs()->withTrashed()->count(), 'log', 'logs'],
+        ];
+
+        $detalle = [];
+        foreach ($dependencias as [$total, $singular, $plural]) {
+            if ($total > 0) {
+                $detalle[] = $total . ' ' . ($total === 1 ? $singular : $plural);
+            }
+        }
+
+        if (count($detalle) > 0) {
+            return redirect('/usuarios/eliminados')->with('error', "No se puede eliminar definitivamente al usuario «{$usuario->nombre} {$usuario->apellido}»: está siendo usado por " . implode(', ', $detalle) . ' (activos o eliminados). Elimina primero esos registros.');
+        }
+
+        try {
+            $usuario->forceDelete();
+        } catch (\Throwable $e) {
+            return redirect('/usuarios/eliminados')->with('error', 'No se pudo eliminar definitivamente el usuario. Intenta de nuevo.');
+        }
+
+        return redirect('/usuarios/eliminados')->with('exito', "El usuario «{$usuario->nombre} {$usuario->apellido}» se eliminó definitivamente.");
     }
 
     private function roles()

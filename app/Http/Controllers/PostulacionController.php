@@ -12,13 +12,56 @@ use Inertia\Inertia;
 
 class PostulacionController extends Controller
 {
+    private const RELACIONES = [
+        'usuario:id,nombre,apellido',
+        'ofertaEmpleo:id,titulo',
+    ];
+
     public function index()
     {
         return Inertia::render('Postulaciones/Index', [
-            'postulaciones' => Postulacion::with([
-                'usuario:id,nombre,apellido',
-                'ofertaEmpleo:id,titulo',
-            ])->paginate(5),
+            'postulaciones' => Postulacion::with(self::RELACIONES)->paginate(5),
+            'eliminados' => false,
+        ]);
+    }
+
+    public function eliminados()
+    {
+        return Inertia::render('Postulaciones/Index', [
+            'postulaciones' => Postulacion::onlyTrashed()->with(self::RELACIONES)->paginate(5),
+            'eliminados' => true,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $postulacion = Postulacion::withTrashed()
+            ->with(['usuario:id,nombre,apellido,correo', 'ofertaEmpleo:id,titulo,empresa'])
+            ->find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones')->with('error', 'La postulación solicitada no existe.');
+        }
+
+        $zona = 'America/Mexico_City';
+
+        return Inertia::render('Postulaciones/Show', [
+            'postulacion' => [
+                'id' => $postulacion->id,
+                'usuario' => $postulacion->usuario
+                    ? "{$postulacion->usuario->nombre} {$postulacion->usuario->apellido}"
+                    : null,
+                'correo' => $postulacion->usuario?->correo,
+                'oferta' => $postulacion->ofertaEmpleo?->titulo,
+                'empresa' => $postulacion->ofertaEmpleo?->empresa,
+                'fecha_postulacion' => Carbon::parse($postulacion->fecha_postulacion)->format('d/m/Y H:i'),
+                'estado' => $postulacion->estado,
+                'comentario' => $postulacion->comentario,
+                'creado' => $postulacion->created_at?->timezone($zona)->format('d/m/Y H:i'),
+                'actualizado' => $postulacion->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'eliminado' => $postulacion->trashed(),
+                'fecha_eliminacion' => $postulacion->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+            ],
         ]);
     }
 
@@ -62,8 +105,21 @@ class PostulacionController extends Controller
                 'estado' => $postulacion->estado,
                 'comentario' => $postulacion->comentario,
             ],
-            'usuarios' => $this->usuarios(),
-            'ofertas' => $this->ofertas(),
+            // Se incluye el usuario y la oferta actuales aunque estén eliminados, para que no desaparezcan del select //
+            'usuarios' => Usuario::withTrashed()
+                ->where(function ($q) use ($postulacion) {
+                    $q->whereNull('deleted_at')->orWhere('id', $postulacion->usuario_id);
+                })
+                ->select('id', 'nombre', 'apellido')
+                ->orderBy('nombre')
+                ->get(),
+            'ofertas' => OfertaEmpleo::withTrashed()
+                ->where(function ($q) use ($postulacion) {
+                    $q->whereNull('deleted_at')->orWhere('id', $postulacion->oferta_empleo_id);
+                })
+                ->select('id', 'titulo', 'empresa')
+                ->orderBy('titulo')
+                ->get(),
         ]);
     }
 
@@ -92,6 +148,75 @@ class PostulacionController extends Controller
         }
 
         return redirect('/postulaciones')->with('exito', 'Postulación actualizada correctamente.');
+    }
+
+    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    public function destroy($id)
+    {
+        $postulacion = Postulacion::with(self::RELACIONES)->find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones')->with('error', 'La postulación solicitada no existe o ya fue eliminada.');
+        }
+
+        try {
+            $postulacion->delete();
+        } catch (\Throwable $e) {
+            return redirect('/postulaciones')->with('error', 'No se pudo eliminar la postulación. Intenta de nuevo.');
+        }
+
+        return redirect('/postulaciones')->with('exito', "{$this->etiqueta($postulacion)} se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+    }
+
+    public function restore($id)
+    {
+        $postulacion = Postulacion::onlyTrashed()->with(self::RELACIONES)->find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones/eliminados')->with('error', 'La postulación solicitada no existe o no está eliminada.');
+        }
+
+        try {
+            $postulacion->restore();
+        } catch (\Throwable $e) {
+            return redirect('/postulaciones/eliminados')->with('error', 'No se pudo restaurar la postulación. Intenta de nuevo.');
+        }
+
+        return redirect('/postulaciones/eliminados')->with('exito', "{$this->etiqueta($postulacion)} se restauró y ya aparece en la lista principal.");
+    }
+
+    // Borrado físico: solo para registros ya eliminados. Ninguna otra tabla depende de las postulaciones. //
+    public function forceDelete($id)
+    {
+        $postulacion = Postulacion::withTrashed()->with(self::RELACIONES)->find($id);
+
+        if (!$postulacion) {
+            return redirect('/postulaciones/eliminados')->with('error', 'La postulación solicitada no existe.');
+        }
+
+        if (!$postulacion->trashed()) {
+            return redirect('/postulaciones')->with('advertencia', 'La postulación debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+        }
+
+        $etiqueta = $this->etiqueta($postulacion);
+
+        try {
+            $postulacion->forceDelete();
+        } catch (\Throwable $e) {
+            return redirect('/postulaciones/eliminados')->with('error', 'No se pudo eliminar definitivamente la postulación. Intenta de nuevo.');
+        }
+
+        return redirect('/postulaciones/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente.");
+    }
+
+    private function etiqueta(Postulacion $postulacion): string
+    {
+        $usuario = $postulacion->usuario
+            ? "{$postulacion->usuario->nombre} {$postulacion->usuario->apellido}"
+            : 'un usuario';
+        $oferta = $postulacion->ofertaEmpleo?->titulo ?? 'una oferta';
+
+        return "La postulación de «{$usuario}» a «{$oferta}»";
     }
 
     private function usuarios()

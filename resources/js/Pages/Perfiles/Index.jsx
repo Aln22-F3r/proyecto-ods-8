@@ -1,18 +1,92 @@
-import { Link } from "@inertiajs/react";
+import { useState } from "react";
+import { Link, router } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 import Paginacion from "../../Components/Paginacion";
+import ConfirmarModal from "../../Components/ConfirmarModal";
 
-export default function Index({ perfiles }) {
+const rojo = "bg-red-800 hover:bg-red-700";
+
+const descripcion = (p) =>
+    `el perfil de «${p.usuario?.nombre ?? ""} ${p.usuario?.apellido ?? ""}»`;
+
+const configuraciones = {
+    eliminar: (p) => ({
+        titulo: "Eliminar perfil",
+        mensaje: `¿Seguro que quieres eliminar ${descripcion(p)}? Se moverá a la lista de eliminados y podrás restaurarlo después.`,
+        texto: "Eliminar",
+        color: rojo,
+    }),
+    restaurar: (p) => ({
+        titulo: "Restaurar perfil",
+        mensaje: `¿Quieres restaurar ${descripcion(p)}? Volverá a aparecer en la lista principal.`,
+        texto: "Restaurar",
+        color: "bg-[#9a5f64] hover:bg-[#9a5f64]/80",
+    }),
+    definitivo: (p) => ({
+        titulo: "Eliminar definitivamente",
+        mensaje: `¿Seguro que quieres eliminar definitivamente ${descripcion(p)}? También se borrarán su CV y su foto. Esta acción no se puede deshacer.`,
+        texto: "Eliminar definitivamente",
+        color: rojo,
+    }),
+};
+
+export default function Index({ perfiles, eliminados = false }) {
+    const [accion, setAccion] = useState(null);
+    const [procesando, setProcesando] = useState(false);
+
+    const config = accion ? configuraciones[accion.tipo](accion.perfil) : null;
+
+    const confirmar = () => {
+        const { tipo, perfil } = accion;
+
+        const opciones = {
+            onStart: () => setProcesando(true),
+            onFinish: () => {
+                setProcesando(false);
+                setAccion(null);
+            },
+        };
+
+        if (tipo === "eliminar") {
+            router.delete(`/perfiles/${perfil.id}`, opciones);
+        } else if (tipo === "restaurar") {
+            router.put(`/perfiles/${perfil.id}/restaurar`, {}, opciones);
+        } else {
+            router.delete(`/perfiles/${perfil.id}/definitivo`, opciones);
+        }
+    };
+
     return (
         <AdminLayout>
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-semibold text-white">Perfiles</h1>
-                <Link
-                    href="/perfiles/crear"
-                    className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80"
-                >
-                    Nuevo
-                </Link>
+                <h1 className="text-2xl font-semibold text-white">
+                    {eliminados ? "Perfiles eliminados" : "Perfiles"}
+                </h1>
+                <div className="flex gap-2">
+                    {eliminados ? (
+                        <Link
+                            href="/perfiles"
+                            className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-500"
+                        >
+                            Volver a perfiles
+                        </Link>
+                    ) : (
+                        <>
+                            <Link
+                                href="/perfiles/eliminados"
+                                className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-500"
+                            >
+                                Ver eliminados
+                            </Link>
+                            <Link
+                                href="/perfiles/crear"
+                                className="rounded bg-[#9a5f64] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a5f64]/80"
+                            >
+                                Nuevo
+                            </Link>
+                        </>
+                    )}
+                </div>
             </div>
 
             <div className="mt-6 overflow-x-auto rounded border border-[#4a4141]">
@@ -28,6 +102,18 @@ export default function Index({ perfiles }) {
                         </tr>
                     </thead>
                     <tbody>
+                        {perfiles.data.length === 0 && (
+                            <tr className="border-t border-[#4a4141]">
+                                <td
+                                    colSpan={6}
+                                    className="px-4 py-6 text-center text-white/70"
+                                >
+                                    {eliminados
+                                        ? "No hay perfiles eliminados."
+                                        : "No hay perfiles registrados."}
+                                </td>
+                            </tr>
+                        )}
                         {perfiles.data.map((p) => (
                             <tr
                                 key={p.id}
@@ -43,25 +129,62 @@ export default function Index({ perfiles }) {
                                 <td className="px-4 py-3">{p.experiencia}</td>
                                 <td className="px-4 py-3">{p.ciudad}</td>
                                 <td className="px-4 py-3">
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         <Link
                                             href={`/perfiles/${p.id}`}
                                             className="rounded bg-gray-600 px-3 py-1 text-white hover:bg-gray-500"
                                         >
                                             Consultar
                                         </Link>
-                                        <Link
-                                            href={`/perfiles/${p.id}/editar`}
-                                            className="rounded bg-[#9a5f64] px-3 py-1 text-white hover:bg-[#9a5f64]/80"
-                                        >
-                                            Editar
-                                        </Link>
-                                        <button
-                                            type="button"
-                                            className="rounded bg-red-800 px-3 py-1 text-white hover:bg-red-700"
-                                        >
-                                            Eliminar
-                                        </button>
+                                        {eliminados ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setAccion({
+                                                            tipo: "restaurar",
+                                                            perfil: p,
+                                                        })
+                                                    }
+                                                    className="rounded bg-[#9a5f64] px-3 py-1 text-white hover:bg-[#9a5f64]/80"
+                                                >
+                                                    Restaurar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setAccion({
+                                                            tipo: "definitivo",
+                                                            perfil: p,
+                                                        })
+                                                    }
+                                                    className={`rounded px-3 py-1 text-white ${rojo}`}
+                                                >
+                                                    Eliminar definitivamente
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Link
+                                                    href={`/perfiles/${p.id}/editar`}
+                                                    className="rounded bg-[#9a5f64] px-3 py-1 text-white hover:bg-[#9a5f64]/80"
+                                                >
+                                                    Editar
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setAccion({
+                                                            tipo: "eliminar",
+                                                            perfil: p,
+                                                        })
+                                                    }
+                                                    className={`rounded px-3 py-1 text-white ${rojo}`}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -71,6 +194,17 @@ export default function Index({ perfiles }) {
             </div>
 
             <Paginacion links={perfiles.links} />
+
+            <ConfirmarModal
+                abierto={accion !== null}
+                titulo={config?.titulo}
+                mensaje={config?.mensaje}
+                textoConfirmar={config?.texto}
+                colorConfirmar={config?.color}
+                procesando={procesando}
+                onConfirmar={confirmar}
+                onCancelar={() => setAccion(null)}
+            />
         </AdminLayout>
     );
 }

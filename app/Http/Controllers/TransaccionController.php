@@ -14,6 +14,46 @@ class TransaccionController extends Controller
     {
         return Inertia::render('Transacciones/Index', [
             'transacciones' => Transaccion::with('usuario:id,nombre,apellido')->paginate(5),
+            'eliminados' => false,
+        ]);
+    }
+
+    public function eliminados()
+    {
+        return Inertia::render('Transacciones/Index', [
+            'transacciones' => Transaccion::onlyTrashed()->with('usuario:id,nombre,apellido')->paginate(5),
+            'eliminados' => true,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $transaccion = Transaccion::withTrashed()
+            ->with('usuario:id,nombre,apellido,correo')
+            ->find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe.');
+        }
+
+        $zona = 'America/Mexico_City';
+
+        return Inertia::render('Transacciones/Show', [
+            'transaccion' => [
+                'id' => $transaccion->id,
+                'usuario' => $transaccion->usuario
+                    ? "{$transaccion->usuario->nombre} {$transaccion->usuario->apellido}"
+                    : null,
+                'correo' => $transaccion->usuario?->correo,
+                'tipo_registro' => $transaccion->tipo_registro,
+                'descripcion' => $transaccion->descripcion,
+                'fecha' => Carbon::parse($transaccion->fecha)->format('d/m/Y H:i'),
+                'estado' => $transaccion->estado,
+                'creado' => $transaccion->created_at?->timezone($zona)->format('d/m/Y H:i'),
+                'actualizado' => $transaccion->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'eliminado' => $transaccion->trashed(),
+                'fecha_eliminacion' => $transaccion->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+            ],
         ]);
     }
 
@@ -56,7 +96,14 @@ class TransaccionController extends Controller
                 'fecha' => Carbon::parse($transaccion->fecha)->format('Y-m-d\TH:i:s'),
                 'estado' => $transaccion->estado,
             ],
-            'usuarios' => $this->usuarios(),
+            // Se incluye el usuario actual aunque esté eliminado, para que no desaparezca del select //
+            'usuarios' => Usuario::withTrashed()
+                ->where(function ($q) use ($transaccion) {
+                    $q->whereNull('deleted_at')->orWhere('id', $transaccion->usuario_id);
+                })
+                ->select('id', 'nombre', 'apellido')
+                ->orderBy('nombre')
+                ->get(),
         ]);
     }
 
@@ -85,6 +132,74 @@ class TransaccionController extends Controller
         }
 
         return redirect('/transacciones')->with('exito', 'Transacción actualizada correctamente.');
+    }
+
+    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    public function destroy($id)
+    {
+        $transaccion = Transaccion::with('usuario:id,nombre,apellido')->find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe o ya fue eliminada.');
+        }
+
+        try {
+            $transaccion->delete();
+        } catch (\Throwable $e) {
+            return redirect('/transacciones')->with('error', 'No se pudo eliminar la transacción. Intenta de nuevo.');
+        }
+
+        return redirect('/transacciones')->with('exito', "{$this->etiqueta($transaccion)} se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+    }
+
+    public function restore($id)
+    {
+        $transaccion = Transaccion::onlyTrashed()->with('usuario:id,nombre,apellido')->find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones/eliminados')->with('error', 'La transacción solicitada no existe o no está eliminada.');
+        }
+
+        try {
+            $transaccion->restore();
+        } catch (\Throwable $e) {
+            return redirect('/transacciones/eliminados')->with('error', 'No se pudo restaurar la transacción. Intenta de nuevo.');
+        }
+
+        return redirect('/transacciones/eliminados')->with('exito', "{$this->etiqueta($transaccion)} se restauró y ya aparece en la lista principal.");
+    }
+
+    // Borrado físico: solo para registros ya eliminados. Ninguna otra tabla depende de las transacciones. //
+    public function forceDelete($id)
+    {
+        $transaccion = Transaccion::withTrashed()->with('usuario:id,nombre,apellido')->find($id);
+
+        if (!$transaccion) {
+            return redirect('/transacciones/eliminados')->with('error', 'La transacción solicitada no existe.');
+        }
+
+        if (!$transaccion->trashed()) {
+            return redirect('/transacciones')->with('advertencia', 'La transacción debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+        }
+
+        $etiqueta = $this->etiqueta($transaccion);
+
+        try {
+            $transaccion->forceDelete();
+        } catch (\Throwable $e) {
+            return redirect('/transacciones/eliminados')->with('error', 'No se pudo eliminar definitivamente la transacción. Intenta de nuevo.');
+        }
+
+        return redirect('/transacciones/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente.");
+    }
+
+    private function etiqueta(Transaccion $transaccion): string
+    {
+        $usuario = $transaccion->usuario
+            ? "{$transaccion->usuario->nombre} {$transaccion->usuario->apellido}"
+            : 'un usuario';
+
+        return "La transacción «{$transaccion->tipo_registro}» de «{$usuario}»";
     }
 
     private function usuarios()

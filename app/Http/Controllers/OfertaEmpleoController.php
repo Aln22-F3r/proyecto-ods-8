@@ -17,6 +17,52 @@ class OfertaEmpleoController extends Controller
     {
         return Inertia::render('OfertasEmpleo/Index', [
             'ofertas' => OfertaEmpleo::with('categoria:id,nombre')->paginate(5),
+            'eliminados' => false,
+        ]);
+    }
+
+    public function eliminados()
+    {
+        return Inertia::render('OfertasEmpleo/Index', [
+            'ofertas' => OfertaEmpleo::onlyTrashed()->with('categoria:id,nombre')->paginate(5),
+            'eliminados' => true,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $oferta = OfertaEmpleo::withTrashed()
+            ->with('categoria:id,nombre')
+            ->withCount(['postulaciones', 'listaDeseos'])
+            ->find($id);
+
+        if (!$oferta) {
+            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe.');
+        }
+
+        $zona = 'America/Mexico_City';
+
+        return Inertia::render('OfertasEmpleo/Show', [
+            'oferta' => [
+                'id' => $oferta->id,
+                'categoria' => $oferta->categoria?->nombre,
+                'titulo' => $oferta->titulo,
+                'empresa' => $oferta->empresa,
+                'descripcion' => $oferta->descripcion,
+                'ubicacion' => $oferta->ubicacion,
+                'salario' => '$' . number_format((float) $oferta->salario, 2),
+                'tipo_empleo' => $oferta->tipo_empleo,
+                'fecha_publicacion' => Carbon::parse($oferta->fecha_publicacion)->format('d/m/Y H:i'),
+                'estado' => $oferta->estado,
+                // Solo se envía la URL si el archivo realmente existe en el disco //
+                'logo' => $this->urlSiExiste($oferta->logo),
+                'postulaciones_count' => $oferta->postulaciones_count,
+                'lista_deseos_count' => $oferta->lista_deseos_count,
+                'creado' => $oferta->created_at?->timezone($zona)->format('d/m/Y H:i'),
+                'actualizado' => $oferta->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'eliminado' => $oferta->trashed(),
+                'fecha_eliminacion' => $oferta->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+            ],
         ]);
     }
 
@@ -75,7 +121,14 @@ class OfertaEmpleoController extends Controller
                 'estado' => $oferta->estado,
                 'logo' => $oferta->logo,
             ],
-            'categorias' => $this->categorias(),
+            // Se incluye la categoría actual aunque esté eliminada, para que no desaparezca del select //
+            'categorias' => Categoria::withTrashed()
+                ->where(function ($q) use ($oferta) {
+                    $q->whereNull('deleted_at')->orWhere('id', $oferta->categoria_id);
+                })
+                ->select('id', 'nombre')
+                ->orderBy('nombre')
+                ->get(),
         ]);
     }
 
@@ -117,11 +170,118 @@ class OfertaEmpleoController extends Controller
         }
 
         // Solo se borra el logo viejo cuando todo se guardó bien y su nombre cambió //
-        if ($logoAnterior) {
-            Storage::disk('public')->delete(Str::after($logoAnterior, '/storage/'));
-        }
+        $this->borrarArchivo($logoAnterior);
 
         return redirect('/ofertas-empleo')->with('exito', 'Oferta de empleo actualizada correctamente.');
+    }
+
+    // Borrado lógico: solo llena deleted_at, el registro y su logo se conservan //
+    public function destroy($id)
+    {
+        $oferta = OfertaEmpleo::find($id);
+
+        if (!$oferta) {
+            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe o ya fue eliminada.');
+        }
+
+        try {
+            $oferta->delete();
+        } catch (\Throwable $e) {
+            return redirect('/ofertas-empleo')->with('error', 'No se pudo eliminar la oferta de empleo. Intenta de nuevo.');
+        }
+
+        return redirect('/ofertas-empleo')->with('exito', "{$this->etiqueta($oferta)} se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+    }
+
+    public function restore($id)
+    {
+        $oferta = OfertaEmpleo::onlyTrashed()->find($id);
+
+        if (!$oferta) {
+            return redirect('/ofertas-empleo/eliminados')->with('error', 'La oferta de empleo solicitada no existe o no está eliminada.');
+        }
+
+        try {
+            $oferta->restore();
+        } catch (\Throwable $e) {
+            return redirect('/ofertas-empleo/eliminados')->with('error', 'No se pudo restaurar la oferta de empleo. Intenta de nuevo.');
+        }
+
+        return redirect('/ofertas-empleo/eliminados')->with('exito', "{$this->etiqueta($oferta)} se restauró y ya aparece en la lista principal.");
+    }
+
+    // Borrado físico: solo para registros ya eliminados y sin dependencias //
+    public function forceDelete($id)
+    {
+        $oferta = OfertaEmpleo::withTrashed()->find($id);
+
+        if (!$oferta) {
+            return redirect('/ofertas-empleo/eliminados')->with('error', 'La oferta de empleo solicitada no existe.');
+        }
+
+        if (!$oferta->trashed()) {
+            return redirect('/ofertas-empleo')->with('advertencia', 'La oferta de empleo debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+        }
+
+        // Se cuentan también las postulaciones eliminadas lógicamente, porque siguen apuntando a la oferta en la base de datos. //
+        // La lista de deseos no tiene borrado lógico, por eso se cuenta sin withTrashed(). //
+        $dependencias = [
+            [$oferta->postulaciones()->withTrashed()->count(), 'postulación', 'postulaciones'],
+            [$oferta->listaDeseos()->count(), 'elemento en la lista de deseos', 'elementos en la lista de deseos'],
+        ];
+
+        $detalle = [];
+        foreach ($dependencias as [$total, $singular, $plural]) {
+            if ($total > 0) {
+                $detalle[] = $total . ' ' . ($total === 1 ? $singular : $plural);
+            }
+        }
+
+        if (count($detalle) > 0) {
+            return redirect('/ofertas-empleo/eliminados')->with('error', "No se puede eliminar definitivamente la oferta «{$oferta->titulo}»: está siendo usada por " . implode(' y ', $detalle) . ' (activos o eliminados). Elimina primero esos registros.');
+        }
+
+        $etiqueta = $this->etiqueta($oferta);
+        $logo = $oferta->logo;
+
+        try {
+            $oferta->forceDelete();
+        } catch (\Throwable $e) {
+            return redirect('/ofertas-empleo/eliminados')->with('error', 'No se pudo eliminar definitivamente la oferta de empleo. Intenta de nuevo.');
+        }
+
+        // El registro ya no existe: se elimina también su logo para no dejarlo huérfano //
+        $this->borrarArchivo($logo);
+
+        return redirect('/ofertas-empleo/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente, junto con su logo.");
+    }
+
+    private function etiqueta(OfertaEmpleo $oferta): string
+    {
+        return "La oferta «{$oferta->titulo}» de «{$oferta->empresa}»";
+    }
+
+    private function relativa(?string $ruta): ?string
+    {
+        return $ruta ? Str::after($ruta, '/storage/') : null;
+    }
+
+    private function urlSiExiste(?string $ruta): ?string
+    {
+        $relativa = $this->relativa($ruta);
+
+        return ($relativa && Storage::disk('public')->exists($relativa))
+            ? Storage::url($relativa)
+            : null;
+    }
+
+    private function borrarArchivo(?string $ruta): void
+    {
+        $relativa = $this->relativa($ruta);
+
+        if ($relativa) {
+            Storage::disk('public')->delete($relativa);
+        }
     }
 
     private function categorias()
