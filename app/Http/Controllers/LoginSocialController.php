@@ -3,26 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Models\LoginSocial;
-use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
+use Illuminate\Database\QueryException;
 
 class LoginSocialController extends Controller
 {
     public function index()
     {
-        return Inertia::render('LoginSociales/Index', [
-            'loginSociales' => LoginSocial::with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => false,
+        return response()->json([
+            'data' => LoginSocial::with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
     public function eliminados()
     {
-        return Inertia::render('LoginSociales/Index', [
-            'loginSociales' => LoginSocial::onlyTrashed()->with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => true,
+        return response()->json([
+            'data' => LoginSocial::onlyTrashed()
+                ->with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
@@ -33,14 +33,17 @@ class LoginSocialController extends Controller
             ->find($id);
 
         if (!$loginSocial) {
-            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe.');
+            return response()->json([
+                'message' => 'El login social solicitado no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('LoginSociales/Show', [
-            'loginSocial' => [
+        return response()->json([
+            'data' => [
                 'id' => $loginSocial->id,
+                'usuario_id' => $loginSocial->usuario_id,
                 'usuario' => $loginSocial->usuario
                     ? "{$loginSocial->usuario->nombre} {$loginSocial->usuario->apellido}"
                     : null,
@@ -56,51 +59,24 @@ class LoginSocialController extends Controller
         ]);
     }
 
-    public function create()
-    {
-        return Inertia::render('LoginSociales/Form', [
-            'usuarios' => $this->usuarios(),
-        ]);
-    }
-
     public function store(Request $request)
     {
         $datos = $this->validar($request);
 
         try {
-            LoginSocial::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar el login social. Intenta de nuevo.');
+            $loginSocial = LoginSocial::create($datos);
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo guardar el login social. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/login-sociales')->with('exito', 'Login social creado correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $loginSocial = LoginSocial::find($id);
-
-        if (!$loginSocial) {
-            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe. No se puede editar.');
-        }
-
-        return Inertia::render('LoginSociales/Form', [
-            'loginSocial' => [
-                'id' => $loginSocial->id,
-                'usuario_id' => $loginSocial->usuario_id,
-                'proveedor' => $loginSocial->proveedor,
-                'proveedor_id' => $loginSocial->proveedor_id,
-                'correo' => $loginSocial->correo,
-            ],
-            // Se incluye el usuario actual aunque esté eliminado, para que no desaparezca del select //
-            'usuarios' => Usuario::withTrashed()
-                ->where(function ($q) use ($loginSocial) {
-                    $q->whereNull('deleted_at')->orWhere('id', $loginSocial->usuario_id);
-                })
-                ->select('id', 'nombre', 'apellido')
-                ->orderBy('nombre')
-                ->get(),
-        ]);
+        return response()->json([
+            'message' => 'Login social creado correctamente.',
+            'data' => $loginSocial->load('usuario:id,nombre,apellido'),
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -108,7 +84,9 @@ class LoginSocialController extends Controller
         $loginSocial = LoginSocial::find($id);
 
         if (!$loginSocial) {
-            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'El login social solicitado no existe o está eliminado.',
+            ], 404);
         }
 
         $datos = $this->validar($request, $loginSocial->id);
@@ -116,75 +94,119 @@ class LoginSocialController extends Controller
         $loginSocial->fill($datos);
 
         if (!$loginSocial->isDirty()) {
-            return redirect('/login-sociales')->with('advertencia', 'No se realizaron cambios en el login social.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en el login social.',
+                'data' => $loginSocial->load('usuario:id,nombre,apellido'),
+            ]);
         }
 
         try {
             $loginSocial->save();
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar el login social. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo actualizar el login social. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/login-sociales')->with('exito', 'Login social actualizado correctamente.');
+        return response()->json([
+            'message' => 'Login social actualizado correctamente.',
+            'data' => $loginSocial->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    // Borrado lógico //
     public function destroy($id)
     {
-        $loginSocial = LoginSocial::with('usuario:id,nombre,apellido')->find($id);
+        $loginSocial = LoginSocial::with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$loginSocial) {
-            return redirect('/login-sociales')->with('error', 'El login social solicitado no existe o ya fue eliminado.');
+            return response()->json([
+                'message' => 'El login social solicitado no existe o ya fue eliminado.',
+            ], 404);
         }
+
+        $etiqueta = $this->etiqueta($loginSocial);
 
         try {
             $loginSocial->delete();
-        } catch (\Throwable $e) {
-            return redirect('/login-sociales')->with('error', 'No se pudo eliminar el login social. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar el login social. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/login-sociales')->with('exito', "{$this->etiqueta($loginSocial)} se eliminó. Puedes restaurarlo desde la lista de eliminados.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó. Puedes restaurarlo desde la lista de eliminados.",
+        ]);
     }
 
     public function restore($id)
     {
-        $loginSocial = LoginSocial::onlyTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $loginSocial = LoginSocial::onlyTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$loginSocial) {
-            return redirect('/login-sociales/eliminados')->with('error', 'El login social solicitado no existe o no está eliminado.');
+            return response()->json([
+                'message' => 'El login social solicitado no existe o no está eliminado.',
+            ], 404);
         }
 
         try {
             $loginSocial->restore();
-        } catch (\Throwable $e) {
-            return redirect('/login-sociales/eliminados')->with('error', 'No se pudo restaurar el login social. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar el login social. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/login-sociales/eliminados')->with('exito', "{$this->etiqueta($loginSocial)} se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => "{$this->etiqueta($loginSocial)} se restauró correctamente.",
+            'data' => $loginSocial->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados. Ninguna otra tabla depende de los login sociales. //
+    // Borrado físico: solo para registros ya eliminados //
     public function forceDelete($id)
     {
-        $loginSocial = LoginSocial::withTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $loginSocial = LoginSocial::withTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$loginSocial) {
-            return redirect('/login-sociales/eliminados')->with('error', 'El login social solicitado no existe.');
+            return response()->json([
+                'message' => 'El login social solicitado no existe.',
+            ], 404);
         }
 
         if (!$loginSocial->trashed()) {
-            return redirect('/login-sociales')->with('advertencia', 'El login social debe eliminarse primero (borrado lógico) antes de poder borrarlo definitivamente.');
+            return response()->json([
+                'message' => 'El login social debe eliminarse primero antes de borrarlo definitivamente.',
+            ], 409);
         }
 
         $etiqueta = $this->etiqueta($loginSocial);
 
         try {
             $loginSocial->forceDelete();
-        } catch (\Throwable $e) {
-            return redirect('/login-sociales/eliminados')->with('error', 'No se pudo eliminar definitivamente el login social. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente el login social. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/login-sociales/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó definitivamente.",
+        ]);
     }
 
     private function etiqueta(LoginSocial $loginSocial): string
@@ -196,16 +218,17 @@ class LoginSocialController extends Controller
         return "El login social de «{$loginSocial->proveedor}» de «{$usuario}»";
     }
 
-    private function usuarios()
-    {
-        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
-    }
-
     private function validar(Request $request, $id = null): array
     {
         return $request->validate([
-            'usuario_id' => ['required', 'exists:usuarios,id'],
-            'proveedor' => ['required', 'in:Google,Facebook,GitHub'],
+            'usuario_id' => [
+                'required',
+                Rule::exists('usuarios', 'id')->whereNull('deleted_at'),
+            ],
+            'proveedor' => [
+                'required',
+                'in:Google,Facebook,GitHub',
+            ],
             'proveedor_id' => [
                 'required',
                 'string',
@@ -221,7 +244,7 @@ class LoginSocialController extends Controller
             'string' => 'El campo :attribute debe ser texto.',
             'min' => 'El campo :attribute debe tener al menos :min caracteres.',
             'max' => 'El campo :attribute no puede tener más de :max caracteres.',
-            'exists' => 'El usuario seleccionado no es válido.',
+            'exists' => 'El usuario seleccionado no es válido o está eliminado.',
             'in' => 'El proveedor seleccionado no es válido.',
             'unique' => 'Ese ID ya está registrado para el proveedor seleccionado.',
             'email' => 'El correo no tiene un formato válido.',

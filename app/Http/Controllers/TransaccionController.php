@@ -6,23 +6,25 @@ use App\Models\Transaccion;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Inertia\Inertia;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\Rule;
 
 class TransaccionController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Transacciones/Index', [
-            'transacciones' => Transaccion::with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => false,
+        return response()->json([
+            'data' => Transaccion::with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
     public function eliminados()
     {
-        return Inertia::render('Transacciones/Index', [
-            'transacciones' => Transaccion::onlyTrashed()->with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => true,
+        return response()->json([
+            'data' => Transaccion::onlyTrashed()
+                ->with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
@@ -33,21 +35,26 @@ class TransaccionController extends Controller
             ->find($id);
 
         if (!$transaccion) {
-            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe.');
+            return response()->json([
+                'message' => 'La transacción solicitada no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('Transacciones/Show', [
-            'transaccion' => [
+        return response()->json([
+            'data' => [
                 'id' => $transaccion->id,
+                'usuario_id' => $transaccion->usuario_id,
                 'usuario' => $transaccion->usuario
                     ? "{$transaccion->usuario->nombre} {$transaccion->usuario->apellido}"
                     : null,
                 'correo' => $transaccion->usuario?->correo,
                 'tipo_registro' => $transaccion->tipo_registro,
                 'descripcion' => $transaccion->descripcion,
-                'fecha' => Carbon::parse($transaccion->fecha)->format('d/m/Y H:i'),
+                'fecha' => Carbon::parse($transaccion->fecha)
+                    ->timezone($zona)
+                    ->format('d/m/Y H:i'),
                 'estado' => $transaccion->estado,
                 'creado' => $transaccion->created_at?->timezone($zona)->format('d/m/Y H:i'),
                 'actualizado' => $transaccion->updated_at?->timezone($zona)->format('d/m/Y H:i'),
@@ -57,54 +64,27 @@ class TransaccionController extends Controller
         ]);
     }
 
-    public function create()
-    {
-        return Inertia::render('Transacciones/Form', [
-            'usuarios' => $this->usuarios(),
-        ]);
-    }
-
     public function store(Request $request)
     {
         $datos = $this->validar($request);
 
-        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+        $datos['fecha'] = Carbon::parse($datos['fecha'])
+            ->format('Y-m-d H:i:s');
 
         try {
-            Transaccion::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar la transacción. Intenta de nuevo.');
+            $transaccion = Transaccion::create($datos);
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo guardar la transacción. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/transacciones')->with('exito', 'Transacción creada correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $transaccion = Transaccion::find($id);
-
-        if (!$transaccion) {
-            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe. No se puede editar.');
-        }
-
-        return Inertia::render('Transacciones/Form', [
-            'transaccion' => [
-                'id' => $transaccion->id,
-                'usuario_id' => $transaccion->usuario_id,
-                'tipo_registro' => $transaccion->tipo_registro,
-                'descripcion' => $transaccion->descripcion,
-                'fecha' => Carbon::parse($transaccion->fecha)->format('Y-m-d\TH:i:s'),
-                'estado' => $transaccion->estado,
-            ],
-            // Se incluye el usuario actual aunque esté eliminado, para que no desaparezca del select //
-            'usuarios' => Usuario::withTrashed()
-                ->where(function ($q) use ($transaccion) {
-                    $q->whereNull('deleted_at')->orWhere('id', $transaccion->usuario_id);
-                })
-                ->select('id', 'nombre', 'apellido')
-                ->orderBy('nombre')
-                ->get(),
-        ]);
+        return response()->json([
+            'message' => 'Transacción creada correctamente.',
+            'data' => $transaccion->load('usuario:id,nombre,apellido'),
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -112,85 +92,132 @@ class TransaccionController extends Controller
         $transaccion = Transaccion::find($id);
 
         if (!$transaccion) {
-            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'La transacción solicitada no existe o está eliminada.',
+            ], 404);
         }
 
-        $datos = $this->validar($request);
+        $datos = $this->validar($request, $id);
 
-        $datos['fecha'] = Carbon::parse($datos['fecha'])->format('Y-m-d H:i:s');
+        $datos['fecha'] = Carbon::parse($datos['fecha'])
+            ->format('Y-m-d H:i:s');
 
         $transaccion->fill($datos);
 
         if (!$transaccion->isDirty()) {
-            return redirect('/transacciones')->with('advertencia', 'No se realizaron cambios en la transacción.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en la transacción.',
+                'data' => $transaccion->load('usuario:id,nombre,apellido'),
+            ]);
         }
 
         try {
             $transaccion->save();
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar la transacción. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo actualizar la transacción. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/transacciones')->with('exito', 'Transacción actualizada correctamente.');
+        return response()->json([
+            'message' => 'Transacción actualizada correctamente.',
+            'data' => $transaccion->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    // Borrado lógico //
     public function destroy($id)
     {
-        $transaccion = Transaccion::with('usuario:id,nombre,apellido')->find($id);
+        $transaccion = Transaccion::with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$transaccion) {
-            return redirect('/transacciones')->with('error', 'La transacción solicitada no existe o ya fue eliminada.');
+            return response()->json([
+                'message' => 'La transacción solicitada no existe o ya fue eliminada.',
+            ], 404);
         }
+
+        $etiqueta = $this->etiqueta($transaccion);
 
         try {
             $transaccion->delete();
-        } catch (\Throwable $e) {
-            return redirect('/transacciones')->with('error', 'No se pudo eliminar la transacción. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar la transacción. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/transacciones')->with('exito', "{$this->etiqueta($transaccion)} se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó. Puedes restaurarla desde la lista de eliminadas.",
+        ]);
     }
 
     public function restore($id)
     {
-        $transaccion = Transaccion::onlyTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $transaccion = Transaccion::onlyTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$transaccion) {
-            return redirect('/transacciones/eliminados')->with('error', 'La transacción solicitada no existe o no está eliminada.');
+            return response()->json([
+                'message' => 'La transacción solicitada no existe o no está eliminada.',
+            ], 404);
         }
 
         try {
             $transaccion->restore();
-        } catch (\Throwable $e) {
-            return redirect('/transacciones/eliminados')->with('error', 'No se pudo restaurar la transacción. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar la transacción. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/transacciones/eliminados')->with('exito', "{$this->etiqueta($transaccion)} se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => "{$this->etiqueta($transaccion)} se restauró correctamente.",
+            'data' => $transaccion->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados. Ninguna otra tabla depende de las transacciones. //
+    // Borrado físico: requiere que la transacción ya esté eliminada lógicamente //
     public function forceDelete($id)
     {
-        $transaccion = Transaccion::withTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $transaccion = Transaccion::withTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$transaccion) {
-            return redirect('/transacciones/eliminados')->with('error', 'La transacción solicitada no existe.');
+            return response()->json([
+                'message' => 'La transacción solicitada no existe.',
+            ], 404);
         }
 
         if (!$transaccion->trashed()) {
-            return redirect('/transacciones')->with('advertencia', 'La transacción debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+            return response()->json([
+                'message' => 'La transacción debe eliminarse primero antes de borrarla definitivamente.',
+            ], 409);
         }
 
         $etiqueta = $this->etiqueta($transaccion);
 
         try {
             $transaccion->forceDelete();
-        } catch (\Throwable $e) {
-            return redirect('/transacciones/eliminados')->with('error', 'No se pudo eliminar definitivamente la transacción. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente la transacción. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/transacciones/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó definitivamente.",
+        ]);
     }
 
     private function etiqueta(Transaccion $transaccion): string
@@ -202,16 +229,17 @@ class TransaccionController extends Controller
         return "La transacción «{$transaccion->tipo_registro}» de «{$usuario}»";
     }
 
-    private function usuarios()
-    {
-        return Usuario::select('id', 'nombre', 'apellido')->orderBy('nombre')->get();
-    }
-
-    private function validar(Request $request): array
+    private function validar(Request $request, $id = null): array
     {
         return $request->validate([
-            'usuario_id' => ['required', 'exists:usuarios,id'],
-            'tipo_registro' => ['required', 'in:Registro,Publicación,Postulación'],
+            'usuario_id' => [
+                'required',
+                Rule::exists('usuarios', 'id')->whereNull('deleted_at'),
+            ],
+            'tipo_registro' => [
+                'required',
+                'in:Registro,Publicación,Postulación',
+            ],
             'descripcion' => ['required', 'string', 'min:5', 'max:255'],
             'fecha' => ['required', 'date'],
             'estado' => ['required', 'in:Pendiente,Completada'],
@@ -220,7 +248,7 @@ class TransaccionController extends Controller
             'string' => 'El campo :attribute debe ser texto.',
             'min' => 'El campo :attribute debe tener al menos :min caracteres.',
             'max' => 'El campo :attribute no puede tener más de :max caracteres.',
-            'exists' => 'El usuario seleccionado no es válido.',
+            'exists' => 'El usuario seleccionado no es válido o está eliminado.',
             'in' => 'El valor seleccionado en :attribute no es válido.',
             'date' => 'La fecha no es válida.',
         ], [

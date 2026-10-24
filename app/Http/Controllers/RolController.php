@@ -4,38 +4,42 @@ namespace App\Http\Controllers;
 
 use App\Models\Rol;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Database\QueryException;
 
 class RolController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Roles/Index', [
-            'roles' => Rol::paginate(5),
-            'eliminados' => false,
+        return response()->json([
+            'data' => Rol::withCount('usuarios')->paginate(15),
         ]);
     }
 
     public function eliminados()
     {
-        return Inertia::render('Roles/Index', [
-            'roles' => Rol::onlyTrashed()->paginate(5),
-            'eliminados' => true,
+        return response()->json([
+            'data' => Rol::onlyTrashed()
+                ->withCount('usuarios')
+                ->paginate(15),
         ]);
     }
 
     public function show($id)
     {
-        $rol = Rol::withTrashed()->withCount('usuarios')->find($id);
+        $rol = Rol::withTrashed()
+            ->withCount('usuarios')
+            ->find($id);
 
         if (!$rol) {
-            return redirect('/roles')->with('error', 'El rol solicitado no existe.');
+            return response()->json([
+                'message' => 'El rol solicitado no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('Roles/Show', [
-            'rol' => [
+        return response()->json([
+            'data' => [
                 'id' => $rol->id,
                 'nombre' => $rol->nombre,
                 'descripcion' => $rol->descripcion,
@@ -53,25 +57,19 @@ class RolController extends Controller
         $datos = $this->validar($request);
 
         try {
-            Rol::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar el rol. Intenta de nuevo.');
+            $rol = Rol::create($datos);
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo guardar el rol.',
+            ], 500);
         }
 
-        return redirect('/roles')->with('exito', 'Rol creado correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $rol = Rol::find($id);
-
-        if (!$rol) {
-            return redirect('/roles')->with('error', 'El rol solicitado no existe. No se puede editar.');
-        }
-
-        return Inertia::render('Roles/Form', [
-            'rol' => $rol,
-        ]);
+        return response()->json([
+            'message' => 'Rol creado correctamente.',
+            'data' => $rol,
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -79,7 +77,9 @@ class RolController extends Controller
         $rol = Rol::find($id);
 
         if (!$rol) {
-            return redirect('/roles')->with('error', 'El rol solicitado no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'El rol solicitado no existe o está eliminado.',
+            ], 404);
         }
 
         $datos = $this->validar($request);
@@ -87,34 +87,52 @@ class RolController extends Controller
         $rol->fill($datos);
 
         if (!$rol->isDirty()) {
-            return redirect('/roles')->with('advertencia', 'No se realizaron cambios en el rol.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en el rol.',
+                'data' => $rol,
+            ]);
         }
 
         try {
             $rol->save();
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar el rol. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo actualizar el rol.',
+            ], 500);
         }
 
-        return redirect('/roles')->with('exito', 'Rol actualizado correctamente.');
+        return response()->json([
+            'message' => 'Rol actualizado correctamente.',
+            'data' => $rol->fresh(),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro se conserva //
+    // Borrado lógico //
     public function destroy($id)
     {
         $rol = Rol::find($id);
 
         if (!$rol) {
-            return redirect('/roles')->with('error', 'El rol solicitado no existe o ya fue eliminado.');
+            return response()->json([
+                'message' => 'El rol solicitado no existe o ya fue eliminado.',
+            ], 404);
         }
 
         try {
             $rol->delete();
-        } catch (\Throwable $e) {
-            return redirect('/roles')->with('error', 'No se pudo eliminar el rol. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar el rol.',
+            ], 500);
         }
 
-        return redirect('/roles')->with('exito', "El rol «{$rol->nombre}» se eliminó. Puedes restaurarlo desde la lista de eliminados.");
+        return response()->json([
+            'message' => "El rol '{$rol->nombre}' se eliminó lógicamente. Puedes restaurarlo.",
+        ]);
     }
 
     public function restore($id)
@@ -122,47 +140,68 @@ class RolController extends Controller
         $rol = Rol::onlyTrashed()->find($id);
 
         if (!$rol) {
-            return redirect('/roles/eliminados')->with('error', 'El rol solicitado no existe o no está eliminado.');
+            return response()->json([
+                'message' => 'El rol solicitado no existe o no está eliminado.',
+            ], 404);
         }
 
         try {
             $rol->restore();
-        } catch (\Throwable $e) {
-            return redirect('/roles/eliminados')->with('error', 'No se pudo restaurar el rol. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar el rol.',
+            ], 500);
         }
 
-        return redirect('/roles/eliminados')->with('exito', "El rol «{$rol->nombre}» se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => "El rol '{$rol->nombre}' se restauró correctamente.",
+            'data' => $rol->fresh(),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados y sin dependencias //
+    // Borrado físico: requiere borrado lógico previo y no permite roles con usuarios asociados //
     public function forceDelete($id)
     {
         $rol = Rol::withTrashed()->find($id);
 
         if (!$rol) {
-            return redirect('/roles/eliminados')->with('error', 'El rol solicitado no existe.');
+            return response()->json([
+                'message' => 'El rol solicitado no existe.',
+            ], 404);
         }
 
         if (!$rol->trashed()) {
-            return redirect('/roles')->with('advertencia', 'El rol debe eliminarse primero (borrado lógico) antes de poder borrarlo definitivamente.');
+            return response()->json([
+                'message' => 'El rol debe eliminarse primero mediante borrado lógico.',
+            ], 409);
         }
 
-        // Cuenta también los usuarios eliminados lógicamente, porque siguen usando el rol en la base de datos //
+        // Incluye usuarios eliminados lógicamente //
         $total = $rol->usuarios()->withTrashed()->count();
 
         if ($total > 0) {
             $usuarios = $total === 1 ? '1 usuario' : "{$total} usuarios";
 
-            return redirect('/roles/eliminados')->with('error', "No se puede eliminar definitivamente el rol «{$rol->nombre}»: está siendo usado por {$usuarios} (activos o eliminados). Reasigna o elimina primero esos usuarios.");
+            return response()->json([
+                'message' => "No se puede eliminar definitivamente el rol '{$rol->nombre}': está asociado a {$usuarios}.",
+            ], 409);
         }
 
         try {
             $rol->forceDelete();
-        } catch (\Throwable $e) {
-            return redirect('/roles/eliminados')->with('error', 'No se pudo eliminar definitivamente el rol. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente el rol.',
+            ], 500);
         }
 
-        return redirect('/roles/eliminados')->with('exito', "El rol «{$rol->nombre}» se eliminó definitivamente.");
+        return response()->json([
+            'message' => "El rol '{$rol->nombre}' se eliminó definitivamente.",
+        ]);
     }
 
     private function validar(Request $request): array

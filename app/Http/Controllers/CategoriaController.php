@@ -4,46 +4,53 @@ namespace App\Http\Controllers;
 
 use App\Models\Categoria;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Database\QueryException;
 
 class CategoriaController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Categorias/Index', [
-            'categorias' => Categoria::paginate(5),
-            'eliminados' => false,
+        return response()->json([
+            'data' => Categoria::withCount('ofertasEmpleo')->paginate(15),
         ]);
     }
 
     public function eliminados()
     {
-        return Inertia::render('Categorias/Index', [
-            'categorias' => Categoria::onlyTrashed()->paginate(5),
-            'eliminados' => true,
+        return response()->json([
+            'data' => Categoria::onlyTrashed()
+                ->withCount('ofertasEmpleo')
+                ->paginate(15),
         ]);
     }
 
     public function show($id)
     {
-        $categoria = Categoria::withTrashed()->withCount('ofertasEmpleo')->find($id);
+        $categoria = Categoria::withTrashed()
+            ->withCount('ofertasEmpleo')
+            ->find($id);
 
         if (!$categoria) {
-            return redirect('/categorias')->with('error', 'La categoría solicitada no existe.');
+            return response()->json([
+                'message' => 'La categoría solicitada no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('Categorias/Show', [
-            'categoria' => [
+        return response()->json([
+            'data' => [
                 'id' => $categoria->id,
                 'nombre' => $categoria->nombre,
                 'descripcion' => $categoria->descripcion,
                 'ofertas_count' => $categoria->ofertas_empleo_count,
-                'creado' => $categoria->created_at?->timezone($zona)->format('d/m/Y H:i'),
-                'actualizado' => $categoria->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'creado' => $categoria->created_at
+                    ?->timezone($zona)->format('d/m/Y H:i'),
+                'actualizado' => $categoria->updated_at
+                    ?->timezone($zona)->format('d/m/Y H:i'),
                 'eliminado' => $categoria->trashed(),
-                'fecha_eliminacion' => $categoria->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+                'fecha_eliminacion' => $categoria->deleted_at
+                    ?->timezone($zona)->format('d/m/Y H:i'),
             ],
         ]);
     }
@@ -53,25 +60,19 @@ class CategoriaController extends Controller
         $datos = $this->validar($request);
 
         try {
-            Categoria::create($datos);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar la categoría. Intenta de nuevo.');
+            $categoria = Categoria::create($datos);
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo guardar la categoría.',
+            ], 500);
         }
 
-        return redirect('/categorias')->with('exito', 'Categoría creada correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $categoria = Categoria::find($id);
-
-        if (!$categoria) {
-            return redirect('/categorias')->with('error', 'La categoría solicitada no existe. No se puede editar.');
-        }
-
-        return Inertia::render('Categorias/Form', [
-            'categoria' => $categoria,
-        ]);
+        return response()->json([
+            'message' => 'Categoría creada correctamente.',
+            'data' => $categoria->loadCount('ofertasEmpleo'),
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -79,7 +80,9 @@ class CategoriaController extends Controller
         $categoria = Categoria::find($id);
 
         if (!$categoria) {
-            return redirect('/categorias')->with('error', 'La categoría solicitada no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'La categoría solicitada no existe o está eliminada.',
+            ], 404);
         }
 
         $datos = $this->validar($request);
@@ -87,34 +90,51 @@ class CategoriaController extends Controller
         $categoria->fill($datos);
 
         if (!$categoria->isDirty()) {
-            return redirect('/categorias')->with('advertencia', 'No se realizaron cambios en la categoría.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en la categoría.',
+                'data' => $categoria->loadCount('ofertasEmpleo'),
+            ]);
         }
 
         try {
             $categoria->save();
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar la categoría. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo actualizar la categoría.',
+            ], 500);
         }
 
-        return redirect('/categorias')->with('exito', 'Categoría actualizada correctamente.');
+        return response()->json([
+            'message' => 'Categoría actualizada correctamente.',
+            'data' => $categoria->fresh()->loadCount('ofertasEmpleo'),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro se conserva //
     public function destroy($id)
     {
         $categoria = Categoria::find($id);
 
         if (!$categoria) {
-            return redirect('/categorias')->with('error', 'La categoría solicitada no existe o ya fue eliminada.');
+            return response()->json([
+                'message' => 'La categoría no existe o ya fue eliminada.',
+            ], 404);
         }
 
         try {
             $categoria->delete();
-        } catch (\Throwable $e) {
-            return redirect('/categorias')->with('error', 'No se pudo eliminar la categoría. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar la categoría.',
+            ], 500);
         }
 
-        return redirect('/categorias')->with('exito', "La categoría «{$categoria->nombre}» se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+        return response()->json([
+            'message' => "La categoría '{$categoria->nombre}' se eliminó correctamente. Puedes restaurarla desde la lista de eliminadas.",
+        ]);
     }
 
     public function restore($id)
@@ -122,47 +142,68 @@ class CategoriaController extends Controller
         $categoria = Categoria::onlyTrashed()->find($id);
 
         if (!$categoria) {
-            return redirect('/categorias/eliminados')->with('error', 'La categoría solicitada no existe o no está eliminada.');
+            return response()->json([
+                'message' => 'La categoría no existe o no está eliminada.',
+            ], 404);
         }
 
         try {
             $categoria->restore();
-        } catch (\Throwable $e) {
-            return redirect('/categorias/eliminados')->with('error', 'No se pudo restaurar la categoría. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar la categoría.',
+            ], 500);
         }
 
-        return redirect('/categorias/eliminados')->with('exito', "La categoría «{$categoria->nombre}» se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => 'Categoría restaurada correctamente.',
+            'data' => $categoria->fresh()->loadCount('ofertasEmpleo'),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados y sin dependencias //
     public function forceDelete($id)
     {
         $categoria = Categoria::withTrashed()->find($id);
 
         if (!$categoria) {
-            return redirect('/categorias/eliminados')->with('error', 'La categoría solicitada no existe.');
+            return response()->json([
+                'message' => 'La categoría solicitada no existe.',
+            ], 404);
         }
 
         if (!$categoria->trashed()) {
-            return redirect('/categorias')->with('advertencia', 'La categoría debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+            return response()->json([
+                'message' => 'La categoría debe eliminarse lógicamente antes de borrarla definitivamente.',
+            ], 409);
         }
 
-        // Cuenta también las ofertas eliminadas lógicamente, porque siguen usando la categoría en la base de datos //
+        // Incluye ofertas activas y eliminadas lógicamente. //
         $total = $categoria->ofertasEmpleo()->withTrashed()->count();
 
         if ($total > 0) {
-            $ofertas = $total === 1 ? '1 oferta de empleo' : "{$total} ofertas de empleo";
-
-            return redirect('/categorias/eliminados')->with('error', "No se puede eliminar definitivamente la categoría «{$categoria->nombre}»: está siendo usada por {$ofertas} (activas o eliminadas). Reasigna o elimina primero esas ofertas.");
+            return response()->json([
+                'message' => "No se puede eliminar definitivamente la categoría '{$categoria->nombre}' porque tiene {$total} oferta(s) de empleo asociada(s), activas o eliminadas.",
+                'dependencias' => [
+                    'ofertas_empleo' => $total,
+                ],
+            ], 409);
         }
 
         try {
             $categoria->forceDelete();
-        } catch (\Throwable $e) {
-            return redirect('/categorias/eliminados')->with('error', 'No se pudo eliminar definitivamente la categoría. Intenta de nuevo.');
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente la categoría.',
+            ], 500);
         }
 
-        return redirect('/categorias/eliminados')->with('exito', "La categoría «{$categoria->nombre}» se eliminó definitivamente.");
+        return response()->json([
+            'message' => 'Categoría eliminada definitivamente.',
+        ]);
     }
 
     private function validar(Request $request): array

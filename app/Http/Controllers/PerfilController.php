@@ -9,23 +9,24 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
+use Throwable;
 
 class PerfilController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Perfiles/Index', [
-            'perfiles' => Perfil::with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => false,
+        return response()->json([
+            'data' => Perfil::with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
     public function eliminados()
     {
-        return Inertia::render('Perfiles/Index', [
-            'perfiles' => Perfil::onlyTrashed()->with('usuario:id,nombre,apellido')->paginate(5),
-            'eliminados' => true,
+        return response()->json([
+            'data' => Perfil::onlyTrashed()
+                ->with('usuario:id,nombre,apellido')
+                ->paginate(15),
         ]);
     }
 
@@ -36,14 +37,17 @@ class PerfilController extends Controller
             ->find($id);
 
         if (!$perfil) {
-            return redirect('/perfiles')->with('error', 'El perfil solicitado no existe.');
+            return response()->json([
+                'message' => 'El perfil solicitado no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('Perfiles/Show', [
-            'perfil' => [
+        return response()->json([
+            'data' => [
                 'id' => $perfil->id,
+                'usuario_id' => $perfil->usuario_id,
                 'usuario' => $perfil->usuario
                     ? "{$perfil->usuario->nombre} {$perfil->usuario->apellido}"
                     : null,
@@ -53,7 +57,6 @@ class PerfilController extends Controller
                 'experiencia' => $perfil->experiencia,
                 'habilidades' => $perfil->habilidades,
                 'ciudad' => $perfil->ciudad,
-                // Solo se envía la URL si el archivo realmente existe en el disco //
                 'cv' => $this->urlSiExiste($perfil->cv),
                 'foto' => $this->urlSiExiste($perfil->foto),
                 'creado' => $perfil->created_at?->timezone($zona)->format('d/m/Y H:i'),
@@ -64,24 +67,18 @@ class PerfilController extends Controller
         ]);
     }
 
-    public function create()
-    {
-        return Inertia::render('Perfiles/Form', [
-            // Usuarios sin perfil; se cuentan también los perfiles eliminados, porque siguen ocupando al usuario //
-            'usuarios' => Usuario::whereDoesntHave('perfil', fn($q) => $q->withTrashed())
-                ->select('id', 'nombre', 'apellido')
-                ->orderBy('nombre')
-                ->get(),
-        ]);
-    }
-
     public function store(Request $request)
     {
         $datos = $this->validar($request);
+        $archivosNuevos = [];
 
         try {
-            DB::transaction(function () use ($request, $datos) {
-                // Se crea el registro para obtener su id (cv es obligatorio en la tabla, queda vacío un instante) //
+            $perfil = DB::transaction(function () use (
+                $request,
+                $datos,
+                &$archivosNuevos
+            ) {
+                // Crear el registro para obtener su ID. //
                 $perfil = Perfil::create([
                     'usuario_id' => $datos['usuario_id'],
                     'profesion_oficio' => $datos['profesion_oficio'],
@@ -91,59 +88,52 @@ class PerfilController extends Controller
                     'ciudad' => $datos['ciudad'],
                     'cv' => '',
                 ]);
-                // Se guardan los archivos con el id y se actualiza la ruta en la base de datos //
+
+                // Guardar el CV. //
                 $cv = $request->file('cv');
-                $rutaCv = $cv->storeAs('cv', "Perfil_{$perfil->id}_cv." . $cv->extension(), 'public');
+                $nombreCv = 'Perfil_' . $perfil->id . '_cv_'
+                    . Str::uuid() . '.' . $cv->extension();
+
+                $rutaCv = $cv->storeAs('cv', $nombreCv, 'public');
+                $archivosNuevos[] = $rutaCv;
                 $perfil->cv = Storage::url($rutaCv);
 
+                // Guardar la foto si fue enviada. //
                 if ($request->hasFile('foto')) {
                     $foto = $request->file('foto');
-                    $rutaFoto = $foto->storeAs('imagenes', "Perfil_{$perfil->id}_1." . $foto->extension(), 'public');
+                    $nombreFoto = 'Perfil_' . $perfil->id . '_'
+                        . Str::uuid() . '.' . $foto->extension();
+
+                    $rutaFoto = $foto->storeAs(
+                        'imagenes',
+                        $nombreFoto,
+                        'public'
+                    );
+
+                    $archivosNuevos[] = $rutaFoto;
                     $perfil->foto = Storage::url($rutaFoto);
                 }
 
                 $perfil->save();
+
+                return $perfil;
             });
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar el perfil. Intenta de nuevo.');
+        } catch (Throwable $e) {
+            report($e);
+
+            foreach ($archivosNuevos as $archivo) {
+                Storage::disk('public')->delete($archivo);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo guardar el perfil. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/perfiles')->with('exito', 'Perfil creado correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $perfil = Perfil::find($id);
-
-        if (!$perfil) {
-            return redirect('/perfiles')->with('error', 'El perfil solicitado no existe. No se puede editar.');
-        }
-
-        return Inertia::render('Perfiles/Form', [
-            'perfil' => [
-                'id' => $perfil->id,
-                'usuario_id' => $perfil->usuario_id,
-                'profesion_oficio' => $perfil->profesion_oficio,
-                'descripcion' => $perfil->descripcion,
-                'experiencia' => $perfil->experiencia,
-                'habilidades' => $perfil->habilidades,
-                'ciudad' => $perfil->ciudad,
-                'cv' => $perfil->cv,
-                'foto' => $perfil->foto,
-            ],
-            // Usuarios sin perfil (activo o eliminado), más el dueño de este perfil aunque esté eliminado //
-            'usuarios' => Usuario::withTrashed()
-                ->where(function ($q) use ($perfil) {
-                    $q->where('id', $perfil->usuario_id)
-                        ->orWhere(function ($q2) {
-                            $q2->whereNull('deleted_at')
-                                ->whereDoesntHave('perfil', fn($p) => $p->withTrashed());
-                        });
-                })
-                ->select('id', 'nombre', 'apellido')
-                ->orderBy('nombre')
-                ->get(),
-        ]);
+        return response()->json([
+            'message' => 'Perfil creado correctamente.',
+            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -151,102 +141,159 @@ class PerfilController extends Controller
         $perfil = Perfil::find($id);
 
         if (!$perfil) {
-            return redirect('/perfiles')->with('error', 'El perfil solicitado no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'El perfil solicitado no existe o está eliminado.',
+            ], 404);
         }
 
         $datos = $this->validar($request, $perfil->id);
 
-        // Los archivos se manejan aparte; aquí solo los datos de texto //
-        $perfil->fill(collect($datos)->except(['cv', 'foto'])->all());
+        // Los datos de texto se actualizan por separado de los archivos. //
+        $perfil->fill(
+            collect($datos)->except(['cv', 'foto'])->all()
+        );
 
-        $archivoNuevo = $request->hasFile('cv') || $request->hasFile('foto');
+        $archivoNuevo = $request->hasFile('cv')
+            || $request->hasFile('foto');
 
         if (!$perfil->isDirty() && !$archivoNuevo) {
-            return redirect('/perfiles')->with('advertencia', 'No se realizaron cambios en el perfil.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en el perfil.',
+                'data' => $perfil->load('usuario:id,nombre,apellido'),
+            ]);
         }
 
-        $anteriores = [];
+        $archivosNuevos = [];
+        $archivosAnteriores = [];
 
         try {
             if ($request->hasFile('cv')) {
                 $cv = $request->file('cv');
-                $ruta = $cv->storeAs('cv', "Perfil_{$perfil->id}_cv." . $cv->extension(), 'public');
-                $url = Storage::url($ruta);
-                if ($perfil->cv !== $url) {
-                    $anteriores[] = $perfil->cv;
-                }
-                $perfil->cv = $url;
+
+                $nombreCv = 'Perfil_' . $perfil->id . '_cv_'
+                    . Str::uuid() . '.' . $cv->extension();
+
+                $rutaCv = $cv->storeAs('cv', $nombreCv, 'public');
+                $archivosNuevos[] = $rutaCv;
+
+                $archivosAnteriores[] = $perfil->cv;
+                $perfil->cv = Storage::url($rutaCv);
             }
 
             if ($request->hasFile('foto')) {
                 $foto = $request->file('foto');
-                $ruta = $foto->storeAs('imagenes', "Perfil_{$perfil->id}_1." . $foto->extension(), 'public');
-                $url = Storage::url($ruta);
-                if ($perfil->foto !== $url) {
-                    $anteriores[] = $perfil->foto;
-                }
-                $perfil->foto = $url;
+
+                $nombreFoto = 'Perfil_' . $perfil->id . '_'
+                    . Str::uuid() . '.' . $foto->extension();
+
+                $rutaFoto = $foto->storeAs(
+                    'imagenes',
+                    $nombreFoto,
+                    'public'
+                );
+
+                $archivosNuevos[] = $rutaFoto;
+                $archivosAnteriores[] = $perfil->foto;
+                $perfil->foto = Storage::url($rutaFoto);
             }
 
             $perfil->save();
-        } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar el perfil. Intenta de nuevo.');
+        } catch (Throwable $e) {
+            report($e);
+
+            foreach ($archivosNuevos as $archivo) {
+                Storage::disk('public')->delete($archivo);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo actualizar el perfil. Intenta de nuevo.',
+            ], 500);
         }
 
-        // Solo se borran los archivos viejos cuando todo se guardó bien y su nombre cambió //
-        foreach ($anteriores as $anterior) {
-            $this->borrarArchivo($anterior);
+        // Eliminar los archivos anteriores después de guardar correctamente. //
+        foreach ($archivosAnteriores as $archivo) {
+            $this->borrarArchivo($archivo);
         }
 
-        return redirect('/perfiles')->with('exito', 'Perfil actualizado correctamente.');
+        return response()->json([
+            'message' => 'Perfil actualizado correctamente.',
+            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro y sus archivos se conservan //
+    // Borrado lógico: conserva el registro y sus archivos. //
     public function destroy($id)
     {
         $perfil = Perfil::with('usuario:id,nombre,apellido')->find($id);
 
         if (!$perfil) {
-            return redirect('/perfiles')->with('error', 'El perfil solicitado no existe o ya fue eliminado.');
+            return response()->json([
+                'message' => 'El perfil solicitado no existe o ya fue eliminado.',
+            ], 404);
         }
+
+        $etiqueta = $this->etiqueta($perfil);
 
         try {
             $perfil->delete();
-        } catch (\Throwable $e) {
-            return redirect('/perfiles')->with('error', 'No se pudo eliminar el perfil. Intenta de nuevo.');
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar el perfil. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/perfiles')->with('exito', "{$this->etiqueta($perfil)} se eliminó. Puedes restaurarlo desde la lista de eliminados.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó. Puedes restaurarlo desde la lista de eliminados.",
+        ]);
     }
 
     public function restore($id)
     {
-        $perfil = Perfil::onlyTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $perfil = Perfil::onlyTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$perfil) {
-            return redirect('/perfiles/eliminados')->with('error', 'El perfil solicitado no existe o no está eliminado.');
+            return response()->json([
+                'message' => 'El perfil solicitado no existe o no está eliminado.',
+            ], 404);
         }
 
         try {
             $perfil->restore();
-        } catch (\Throwable $e) {
-            return redirect('/perfiles/eliminados')->with('error', 'No se pudo restaurar el perfil. Intenta de nuevo.');
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar el perfil. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/perfiles/eliminados')->with('exito', "{$this->etiqueta($perfil)} se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => "{$this->etiqueta($perfil)} se restauró correctamente.",
+            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados. Ninguna otra tabla depende de los perfiles. //
+    // Borrado físico: exige que el perfil ya esté eliminado lógicamente. //
     public function forceDelete($id)
     {
-        $perfil = Perfil::withTrashed()->with('usuario:id,nombre,apellido')->find($id);
+        $perfil = Perfil::withTrashed()
+            ->with('usuario:id,nombre,apellido')
+            ->find($id);
 
         if (!$perfil) {
-            return redirect('/perfiles/eliminados')->with('error', 'El perfil solicitado no existe.');
+            return response()->json([
+                'message' => 'El perfil solicitado no existe.',
+            ], 404);
         }
 
         if (!$perfil->trashed()) {
-            return redirect('/perfiles')->with('advertencia', 'El perfil debe eliminarse primero (borrado lógico) antes de poder borrarlo definitivamente.');
+            return response()->json([
+                'message' => 'El perfil debe eliminarse primero antes de borrarlo definitivamente.',
+            ], 409);
         }
 
         $etiqueta = $this->etiqueta($perfil);
@@ -254,16 +301,22 @@ class PerfilController extends Controller
 
         try {
             $perfil->forceDelete();
-        } catch (\Throwable $e) {
-            return redirect('/perfiles/eliminados')->with('error', 'No se pudo eliminar definitivamente el perfil. Intenta de nuevo.');
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente el perfil. Intenta de nuevo.',
+            ], 500);
         }
 
-        // El registro ya no existe: se eliminan también sus archivos para no dejarlos huérfanos //
+        // Eliminar los archivos después de borrar el registro. //
         foreach ($archivos as $archivo) {
             $this->borrarArchivo($archivo);
         }
 
-        return redirect('/perfiles/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente, junto con su CV y su foto.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó definitivamente, junto con su CV y su foto.",
+        ]);
     }
 
     private function etiqueta(Perfil $perfil): string
@@ -306,13 +359,28 @@ class PerfilController extends Controller
                 'exists:usuarios,id',
                 Rule::unique('perfiles', 'usuario_id')->ignore($id),
             ],
-            'profesion_oficio' => ['required', 'string', 'min:3', 'max:100'],
+            'profesion_oficio' => [
+                'required',
+                'string',
+                'min:3',
+                'max:100',
+            ],
             'descripcion' => ['required', 'string', 'min:10'],
             'experiencia' => ['required', 'integer', 'min:0', 'max:60'],
             'habilidades' => ['required', 'string', 'min:3'],
             'ciudad' => ['required', 'string', 'min:2', 'max:100'],
-            'cv' => [$id ? 'nullable' : 'required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
-            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'cv' => [
+                $id ? 'nullable' : 'required',
+                'file',
+                'mimes:pdf,doc,docx',
+                'max:5120',
+            ],
+            'foto' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
         ], [
             'required' => 'El campo :attribute es obligatorio.',
             'string' => 'El campo :attribute debe ser texto.',

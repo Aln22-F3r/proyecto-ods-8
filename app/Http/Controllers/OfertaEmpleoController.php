@@ -9,24 +9,26 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Inertia\Inertia;
 
 class OfertaEmpleoController extends Controller
 {
     public function index()
     {
-        return Inertia::render('OfertasEmpleo/Index', [
-            'ofertas' => OfertaEmpleo::with('categoria:id,nombre')->paginate(5),
-            'eliminados' => false,
-        ]);
+        $ofertas = OfertaEmpleo::with('categoria:id,nombre')
+            ->withCount(['postulaciones', 'listaDeseos'])
+            ->paginate(15);
+
+        return response()->json($ofertas);
     }
 
     public function eliminados()
     {
-        return Inertia::render('OfertasEmpleo/Index', [
-            'ofertas' => OfertaEmpleo::onlyTrashed()->with('categoria:id,nombre')->paginate(5),
-            'eliminados' => true,
-        ]);
+        $ofertas = OfertaEmpleo::onlyTrashed()
+            ->with('categoria:id,nombre')
+            ->withCount(['postulaciones', 'listaDeseos'])
+            ->paginate(15);
+
+        return response()->json($ofertas);
     }
 
     public function show($id)
@@ -37,39 +39,34 @@ class OfertaEmpleoController extends Controller
             ->find($id);
 
         if (!$oferta) {
-            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe.');
+            return response()->json([
+                'message' => 'La oferta de empleo solicitada no existe.',
+            ], 404);
         }
 
         $zona = 'America/Mexico_City';
 
-        return Inertia::render('OfertasEmpleo/Show', [
-            'oferta' => [
+        return response()->json([
+            'data' => [
                 'id' => $oferta->id,
+                'categoria_id' => $oferta->categoria_id,
                 'categoria' => $oferta->categoria?->nombre,
                 'titulo' => $oferta->titulo,
                 'empresa' => $oferta->empresa,
                 'descripcion' => $oferta->descripcion,
                 'ubicacion' => $oferta->ubicacion,
-                'salario' => '$' . number_format((float) $oferta->salario, 2),
+                'salario' => $oferta->salario,
                 'tipo_empleo' => $oferta->tipo_empleo,
-                'fecha_publicacion' => Carbon::parse($oferta->fecha_publicacion)->format('d/m/Y H:i'),
+                'fecha_publicacion' => $oferta->fecha_publicacion,
                 'estado' => $oferta->estado,
-                // Solo se envía la URL si el archivo realmente existe en el disco //
                 'logo' => $this->urlSiExiste($oferta->logo),
                 'postulaciones_count' => $oferta->postulaciones_count,
                 'lista_deseos_count' => $oferta->lista_deseos_count,
-                'creado' => $oferta->created_at?->timezone($zona)->format('d/m/Y H:i'),
-                'actualizado' => $oferta->updated_at?->timezone($zona)->format('d/m/Y H:i'),
+                'created_at' => $oferta->created_at?->timezone($zona)->toDateTimeString(),
+                'updated_at' => $oferta->updated_at?->timezone($zona)->toDateTimeString(),
                 'eliminado' => $oferta->trashed(),
-                'fecha_eliminacion' => $oferta->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
+                'deleted_at' => $oferta->deleted_at?->timezone($zona)->toDateTimeString(),
             ],
-        ]);
-    }
-
-    public function create()
-    {
-        return Inertia::render('OfertasEmpleo/Form', [
-            'categorias' => $this->categorias(),
         ]);
     }
 
@@ -77,59 +74,62 @@ class OfertaEmpleoController extends Controller
     {
         $datos = $this->validar($request);
 
-        $datos['fecha_publicacion'] = Carbon::parse($datos['fecha_publicacion'])->format('Y-m-d H:i:s');
+        $datos['fecha_publicacion'] = Carbon::parse(
+            $datos['fecha_publicacion']
+        )->format('Y-m-d H:i:s');
+
+        $rutaNueva = null;
 
         try {
-            DB::transaction(function () use ($request, $datos) {
-                // Se crea el registro para obtener su id //
-                $oferta = OfertaEmpleo::create(collect($datos)->except('logo')->all());
+            $oferta = DB::transaction(function () use (
+                $request,
+                $datos,
+                &$rutaNueva
+            ) {
+                // Crear primero el registro sin el logo. //
+                $oferta = OfertaEmpleo::create(
+                    collect($datos)->except('logo')->all()
+                );
 
-                // Se guarda el logo con el id y se actualiza la ruta en la base de datos //
                 if ($request->hasFile('logo')) {
                     $logo = $request->file('logo');
-                    $ruta = $logo->storeAs('imagenes', "OfertaEmpleo_{$oferta->id}_1." . $logo->extension(), 'public');
-                    $oferta->logo = Storage::url($ruta);
+
+                    // Nombre único para evitar sobrescribir archivos existentes. //
+                    $nombre = 'OfertaEmpleo_' . $oferta->id . '_'
+                        . Str::uuid() . '.' . $logo->extension();
+
+                    $rutaNueva = $logo->storeAs(
+                        'imagenes',
+                        $nombre,
+                        'public'
+                    );
+
+                    if (!$rutaNueva) {
+                        throw new \RuntimeException(
+                            'No se pudo guardar el logo.'
+                        );
+                    }
+
+                    $oferta->logo = Storage::url($rutaNueva);
                     $oferta->save();
                 }
+
+                return $oferta;
             });
         } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo guardar la oferta de empleo. Intenta de nuevo.');
+            $this->borrarArchivo($rutaNueva);
+
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo guardar la oferta de empleo. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/ofertas-empleo')->with('exito', 'Oferta de empleo creada correctamente.');
-    }
-
-    public function edit($id)
-    {
-        $oferta = OfertaEmpleo::find($id);
-
-        if (!$oferta) {
-            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe. No se puede editar.');
-        }
-
-        return Inertia::render('OfertasEmpleo/Form', [
-            'oferta' => [
-                'id' => $oferta->id,
-                'categoria_id' => $oferta->categoria_id,
-                'titulo' => $oferta->titulo,
-                'empresa' => $oferta->empresa,
-                'descripcion' => $oferta->descripcion,
-                'ubicacion' => $oferta->ubicacion,
-                'salario' => $oferta->salario,
-                'tipo_empleo' => $oferta->tipo_empleo,
-                'fecha_publicacion' => Carbon::parse($oferta->fecha_publicacion)->format('Y-m-d\TH:i:s'),
-                'estado' => $oferta->estado,
-                'logo' => $oferta->logo,
-            ],
-            // Se incluye la categoría actual aunque esté eliminada, para que no desaparezca del select //
-            'categorias' => Categoria::withTrashed()
-                ->where(function ($q) use ($oferta) {
-                    $q->whereNull('deleted_at')->orWhere('id', $oferta->categoria_id);
-                })
-                ->select('id', 'nombre')
-                ->orderBy('nombre')
-                ->get(),
-        ]);
+        return response()->json([
+            'message' => 'Oferta de empleo creada correctamente.',
+            'data' => $oferta->load('categoria:id,nombre'),
+        ], 201);
     }
 
     public function update(Request $request, $id)
@@ -137,60 +137,105 @@ class OfertaEmpleoController extends Controller
         $oferta = OfertaEmpleo::find($id);
 
         if (!$oferta) {
-            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe. No se puede actualizar.');
+            return response()->json([
+                'message' => 'La oferta de empleo solicitada no existe o está eliminada.',
+            ], 404);
         }
 
         $datos = $this->validar($request);
 
-        $datos['fecha_publicacion'] = Carbon::parse($datos['fecha_publicacion'])->format('Y-m-d H:i:s');
+        $datos['fecha_publicacion'] = Carbon::parse(
+            $datos['fecha_publicacion']
+        )->format('Y-m-d H:i:s');
 
-        // El logo se maneja aparte; aquí solo los datos de texto //
+        // El logo se gestiona por separado. //
         $oferta->fill(collect($datos)->except('logo')->all());
 
         if (!$oferta->isDirty() && !$request->hasFile('logo')) {
-            return redirect('/ofertas-empleo')->with('advertencia', 'No se realizaron cambios en la oferta de empleo.');
+            return response()->json([
+                'message' => 'No se realizaron cambios en la oferta de empleo.',
+                'data' => $oferta->load('categoria:id,nombre'),
+            ]);
         }
 
+        $rutaNueva = null;
         $logoAnterior = null;
 
         try {
-            if ($request->hasFile('logo')) {
-                $logo = $request->file('logo');
-                $ruta = $logo->storeAs('imagenes', "OfertaEmpleo_{$oferta->id}_1." . $logo->extension(), 'public');
-                $url = Storage::url($ruta);
-                if ($oferta->logo !== $url) {
-                    $logoAnterior = $oferta->logo;
-                }
-                $oferta->logo = $url;
-            }
+            DB::transaction(function () use (
+                $request,
+                $oferta,
+                &$rutaNueva,
+                &$logoAnterior
+            ) {
+                if ($request->hasFile('logo')) {
+                    $logo = $request->file('logo');
 
-            $oferta->save();
+                    $nombre = 'OfertaEmpleo_' . $oferta->id . '_'
+                        . Str::uuid() . '.' . $logo->extension();
+
+                    $rutaNueva = $logo->storeAs(
+                        'imagenes',
+                        $nombre,
+                        'public'
+                    );
+
+                    if (!$rutaNueva) {
+                        throw new \RuntimeException(
+                            'No se pudo guardar el logo.'
+                        );
+                    }
+
+                    $logoAnterior = $oferta->logo;
+                    $oferta->logo = Storage::url($rutaNueva);
+                }
+
+                $oferta->save();
+            });
         } catch (\Throwable $e) {
-            return back()->with('error', 'No se pudo actualizar la oferta de empleo. Intenta de nuevo.');
+            $this->borrarArchivo($rutaNueva);
+
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo actualizar la oferta de empleo. Intenta de nuevo.',
+            ], 500);
         }
 
-        // Solo se borra el logo viejo cuando todo se guardó bien y su nombre cambió //
-        $this->borrarArchivo($logoAnterior);
+        // Borrar el logo anterior solamente después de guardar los cambios. //
+        if ($logoAnterior && $logoAnterior !== $oferta->logo) {
+            $this->borrarArchivo($logoAnterior);
+        }
 
-        return redirect('/ofertas-empleo')->with('exito', 'Oferta de empleo actualizada correctamente.');
+        return response()->json([
+            'message' => 'Oferta de empleo actualizada correctamente.',
+            'data' => $oferta->fresh()->load('categoria:id,nombre'),
+        ]);
     }
 
-    // Borrado lógico: solo llena deleted_at, el registro y su logo se conservan //
     public function destroy($id)
     {
         $oferta = OfertaEmpleo::find($id);
 
         if (!$oferta) {
-            return redirect('/ofertas-empleo')->with('error', 'La oferta de empleo solicitada no existe o ya fue eliminada.');
+            return response()->json([
+                'message' => 'La oferta de empleo solicitada no existe o ya fue eliminada.',
+            ], 404);
         }
 
         try {
             $oferta->delete();
         } catch (\Throwable $e) {
-            return redirect('/ofertas-empleo')->with('error', 'No se pudo eliminar la oferta de empleo. Intenta de nuevo.');
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar la oferta de empleo. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/ofertas-empleo')->with('exito', "{$this->etiqueta($oferta)} se eliminó. Puedes restaurarla desde la lista de eliminadas.");
+        return response()->json([
+            'message' => "{$this->etiqueta($oferta)} se eliminó. Puedes restaurarla.",
+        ]);
     }
 
     public function restore($id)
@@ -198,47 +243,73 @@ class OfertaEmpleoController extends Controller
         $oferta = OfertaEmpleo::onlyTrashed()->find($id);
 
         if (!$oferta) {
-            return redirect('/ofertas-empleo/eliminados')->with('error', 'La oferta de empleo solicitada no existe o no está eliminada.');
+            return response()->json([
+                'message' => 'La oferta de empleo solicitada no existe o no está eliminada.',
+            ], 404);
         }
 
         try {
             $oferta->restore();
         } catch (\Throwable $e) {
-            return redirect('/ofertas-empleo/eliminados')->with('error', 'No se pudo restaurar la oferta de empleo. Intenta de nuevo.');
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo restaurar la oferta de empleo. Intenta de nuevo.',
+            ], 500);
         }
 
-        return redirect('/ofertas-empleo/eliminados')->with('exito', "{$this->etiqueta($oferta)} se restauró y ya aparece en la lista principal.");
+        return response()->json([
+            'message' => "{$this->etiqueta($oferta)} se restauró correctamente.",
+            'data' => $oferta->fresh()->load('categoria:id,nombre'),
+        ]);
     }
 
-    // Borrado físico: solo para registros ya eliminados y sin dependencias //
     public function forceDelete($id)
     {
         $oferta = OfertaEmpleo::withTrashed()->find($id);
 
         if (!$oferta) {
-            return redirect('/ofertas-empleo/eliminados')->with('error', 'La oferta de empleo solicitada no existe.');
+            return response()->json([
+                'message' => 'La oferta de empleo solicitada no existe.',
+            ], 404);
         }
 
         if (!$oferta->trashed()) {
-            return redirect('/ofertas-empleo')->with('advertencia', 'La oferta de empleo debe eliminarse primero (borrado lógico) antes de poder borrarla definitivamente.');
+            return response()->json([
+                'message' => 'La oferta debe eliminarse primero de forma lógica antes de borrarla definitivamente.',
+            ], 409);
         }
 
-        // Se cuentan también las postulaciones eliminadas lógicamente, porque siguen apuntando a la oferta en la base de datos. //
-        // La lista de deseos no tiene borrado lógico, por eso se cuenta sin withTrashed(). //
+        // Contar también las postulaciones que estén eliminadas lógicamente. //
         $dependencias = [
-            [$oferta->postulaciones()->withTrashed()->count(), 'postulación', 'postulaciones'],
-            [$oferta->listaDeseos()->count(), 'elemento en la lista de deseos', 'elementos en la lista de deseos'],
+            [
+                $oferta->postulaciones()->withTrashed()->count(),
+                'postulación',
+                'postulaciones',
+            ],
+            [
+                $oferta->listaDeseos()->count(),
+                'elemento en la lista de deseos',
+                'elementos en la lista de deseos',
+            ],
         ];
 
         $detalle = [];
+
         foreach ($dependencias as [$total, $singular, $plural]) {
             if ($total > 0) {
-                $detalle[] = $total . ' ' . ($total === 1 ? $singular : $plural);
+                $detalle[] = $total . ' '
+                    . ($total === 1 ? $singular : $plural);
             }
         }
 
         if (count($detalle) > 0) {
-            return redirect('/ofertas-empleo/eliminados')->with('error', "No se puede eliminar definitivamente la oferta «{$oferta->titulo}»: está siendo usada por " . implode(' y ', $detalle) . ' (activos o eliminados). Elimina primero esos registros.');
+            return response()->json([
+                'message' => "No se puede eliminar definitivamente la oferta «{$oferta->titulo}»: está siendo usada por "
+                    . implode(' y ', $detalle)
+                    . '. Elimina primero esos registros dependientes.',
+                'dependencias' => $detalle,
+            ], 409);
         }
 
         $etiqueta = $this->etiqueta($oferta);
@@ -247,13 +318,19 @@ class OfertaEmpleoController extends Controller
         try {
             $oferta->forceDelete();
         } catch (\Throwable $e) {
-            return redirect('/ofertas-empleo/eliminados')->with('error', 'No se pudo eliminar definitivamente la oferta de empleo. Intenta de nuevo.');
+            report($e);
+
+            return response()->json([
+                'message' => 'No se pudo eliminar definitivamente la oferta. Intenta de nuevo.',
+            ], 500);
         }
 
-        // El registro ya no existe: se elimina también su logo para no dejarlo huérfano //
+        // Eliminar el archivo solamente después de borrar el registro. //
         $this->borrarArchivo($logo);
 
-        return redirect('/ofertas-empleo/eliminados')->with('exito', "{$etiqueta} se eliminó definitivamente, junto con su logo.");
+        return response()->json([
+            'message' => "{$etiqueta} se eliminó definitivamente, junto con su logo.",
+        ]);
     }
 
     private function etiqueta(OfertaEmpleo $oferta): string
@@ -263,7 +340,11 @@ class OfertaEmpleoController extends Controller
 
     private function relativa(?string $ruta): ?string
     {
-        return $ruta ? Str::after($ruta, '/storage/') : null;
+        if (!$ruta) {
+            return null;
+        }
+
+        return Str::after($ruta, '/storage/');
     }
 
     private function urlSiExiste(?string $ruta): ?string
@@ -277,31 +358,73 @@ class OfertaEmpleoController extends Controller
 
     private function borrarArchivo(?string $ruta): void
     {
-        $relativa = $this->relativa($ruta);
+        if (!$ruta) {
+            return;
+        }
+
+        $relativa = str_contains($ruta, '/storage/')
+            ? $this->relativa($ruta)
+            : $ruta;
 
         if ($relativa) {
             Storage::disk('public')->delete($relativa);
         }
     }
 
-    private function categorias()
-    {
-        return Categoria::select('id', 'nombre')->orderBy('nombre')->get();
-    }
-
     private function validar(Request $request): array
     {
         return $request->validate([
-            'categoria_id' => ['required', 'exists:categorias,id'],
-            'titulo' => ['required', 'string', 'min:3', 'max:150'],
-            'empresa' => ['required', 'string', 'min:2', 'max:150'],
-            'descripcion' => ['required', 'string', 'min:10'],
-            'ubicacion' => ['required', 'string', 'min:3', 'max:150'],
-            'salario' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
-            'tipo_empleo' => ['required', 'in:Tiempo completo,Medio tiempo,Por obra'],
-            'fecha_publicacion' => ['required', 'date'],
-            'estado' => ['required', 'in:Abierta,Cerrada'],
-            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'categoria_id' => [
+                'required',
+                'exists:categorias,id',
+            ],
+            'titulo' => [
+                'required',
+                'string',
+                'min:3',
+                'max:150',
+            ],
+            'empresa' => [
+                'required',
+                'string',
+                'min:2',
+                'max:150',
+            ],
+            'descripcion' => [
+                'required',
+                'string',
+                'min:10',
+            ],
+            'ubicacion' => [
+                'required',
+                'string',
+                'min:3',
+                'max:150',
+            ],
+            'salario' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:99999999.99',
+            ],
+            'tipo_empleo' => [
+                'required',
+                'in:Tiempo completo,Medio tiempo,Por obra',
+            ],
+            'fecha_publicacion' => [
+                'required',
+                'date',
+            ],
+            'estado' => [
+                'required',
+                'in:Abierta,Cerrada',
+            ],
+            'logo' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
         ], [
             'required' => 'El campo :attribute es obligatorio.',
             'string' => 'El campo :attribute debe ser texto.',
