@@ -124,5 +124,3 @@ Route::middleware('auth:admin')->group(function () {
     Route::delete('/logs/{id}', [LogController::class, 'destroy']);
     Route::delete('/logs/{id}/definitivo', [LogController::class, 'forceDelete']);
 });
-
-require __DIR__ . '/auth.php';
