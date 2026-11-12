@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Rol;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Gate;
 
 class RolController extends Controller
 {
     public function index()
     {
+        Gate::authorize('consultar');
+
         return response()->json([
             'data' => Rol::withCount('usuarios')->paginate(15),
         ]);
@@ -17,6 +20,8 @@ class RolController extends Controller
 
     public function eliminados()
     {
+        Gate::authorize('consultar');
+
         return response()->json([
             'data' => Rol::onlyTrashed()
                 ->withCount('usuarios')
@@ -26,6 +31,8 @@ class RolController extends Controller
 
     public function show($id)
     {
+        Gate::authorize('consultar');
+
         $rol = Rol::withTrashed()
             ->withCount('usuarios')
             ->find($id);
@@ -54,6 +61,8 @@ class RolController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('crear');
+
         $datos = $this->validar($request);
 
         try {
@@ -74,6 +83,8 @@ class RolController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('editar');
+
         $rol = Rol::find($id);
 
         if (!$rol) {
@@ -112,6 +123,8 @@ class RolController extends Controller
     // Borrado lógico //
     public function destroy($id)
     {
+        Gate::authorize('eliminar');
+
         $rol = Rol::find($id);
 
         if (!$rol) {
@@ -137,6 +150,8 @@ class RolController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('eliminar');
+
         $rol = Rol::onlyTrashed()->find($id);
 
         if (!$rol) {
@@ -161,9 +176,11 @@ class RolController extends Controller
         ]);
     }
 
-    // Borrado físico: requiere borrado lógico previo y no permite roles con usuarios asociados //
+    // Borrado físico requiere borrado lógico previo y no permite roles con usuarios asociados //
     public function forceDelete($id)
     {
+        Gate::authorize('eliminar');
+
         $rol = Rol::withTrashed()->find($id);
 
         if (!$rol) {

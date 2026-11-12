@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Rol;
+use App\Http\Controllers\Concerns\ManejaErroresBD;
 use App\Models\Usuario;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Illuminate\Database\QueryException;
 
 class UsuarioController extends Controller
 {
+    use ManejaErroresBD;
+
     public function index()
     {
+        Gate::authorize('consultar');
+
         return response()->json([
             'data' => Usuario::with('rol:id,nombre')->paginate(15),
         ]);
@@ -21,6 +26,8 @@ class UsuarioController extends Controller
 
     public function eliminados()
     {
+        Gate::authorize('consultar');
+
         return response()->json([
             'data' => Usuario::onlyTrashed()
                 ->with('rol:id,nombre')
@@ -30,6 +37,8 @@ class UsuarioController extends Controller
 
     public function show($id)
     {
+        Gate::authorize('consultar');
+
         $usuario = Usuario::withTrashed()
             ->with(['rol:id,nombre', 'perfil'])
             ->withCount([
@@ -78,6 +87,8 @@ class UsuarioController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('crear');
+
         $datos = $this->validar($request);
 
         $datos['password'] = Hash::make($datos['password']);
@@ -87,11 +98,7 @@ class UsuarioController extends Controller
         try {
             $usuario = Usuario::create($datos);
         } catch (QueryException $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo guardar el usuario.',
-            ], 500);
+            return $this->errorBD($e, 'guardar el usuario');
         }
 
         return response()->json([
@@ -102,6 +109,8 @@ class UsuarioController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('editar');
+
         $usuario = Usuario::find($id);
 
         if (!$usuario) {
@@ -134,11 +143,7 @@ class UsuarioController extends Controller
         try {
             $usuario->save();
         } catch (QueryException $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo actualizar el usuario.',
-            ], 500);
+            return $this->errorBD($e, 'actualizar el usuario');
         }
 
         return response()->json([
@@ -150,6 +155,8 @@ class UsuarioController extends Controller
     // Borrado lógico //
     public function destroy($id)
     {
+        Gate::authorize('eliminar');
+
         $usuario = Usuario::find($id);
 
         if (!$usuario) {
@@ -161,11 +168,7 @@ class UsuarioController extends Controller
         try {
             $usuario->delete();
         } catch (QueryException $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo eliminar el usuario.',
-            ], 500);
+            return $this->errorBD($e, 'eliminar el usuario');
         }
 
         return response()->json([
@@ -175,6 +178,8 @@ class UsuarioController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('eliminar');
+
         $usuario = Usuario::onlyTrashed()->find($id);
 
         if (!$usuario) {
@@ -186,11 +191,7 @@ class UsuarioController extends Controller
         try {
             $usuario->restore();
         } catch (QueryException $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo restaurar el usuario.',
-            ], 500);
+            return $this->errorBD($e, 'restaurar el usuario');
         }
 
         return response()->json([
@@ -202,6 +203,8 @@ class UsuarioController extends Controller
     // Borrado físico: requiere borrado lógico previo y no permite dependencias. //
     public function forceDelete($id)
     {
+        Gate::authorize('eliminar');
+
         $usuario = Usuario::withTrashed()->find($id);
 
         if (!$usuario) {
@@ -268,11 +271,7 @@ class UsuarioController extends Controller
         try {
             $usuario->forceDelete();
         } catch (QueryException $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo eliminar definitivamente el usuario.',
-            ], 500);
+            return $this->errorBD($e, 'eliminar definitivamente el usuario');
         }
 
         return response()->json([
