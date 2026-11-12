@@ -2,24 +2,47 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Vite;
+use App\Models\Administrador;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        Vite::prefetch(concurrency: 3);
+        Gate::define('consultar', function ($admin) {
+            return $admin instanceof Administrador
+                && $admin->activo
+                && in_array($admin->nivel, [1, 2, 3], true);
+        });
+
+        Gate::define('crear', function ($admin) {
+            return $admin instanceof Administrador
+                && $admin->activo
+                && in_array($admin->nivel, [2, 3], true);
+        });
+
+        Gate::define('editar', function ($admin) {
+            return $admin instanceof Administrador
+                && $admin->activo
+                && in_array($admin->nivel, [2, 3], true);
+        });
+
+        Gate::define('eliminar', function ($admin) {
+            return $admin instanceof Administrador
+                && $admin->activo
+                && $admin->nivel === 3;
+        });
+
+        Gate::define('administrar-cuentas', function ($admin) {
+            return $admin instanceof Administrador
+                && $admin->activo
+                && $admin->nivel === 3;
+        });
     }
 }
