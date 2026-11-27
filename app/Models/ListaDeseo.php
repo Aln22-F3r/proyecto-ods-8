@@ -8,15 +8,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ListaDeseo extends Model
 {
     protected $table = 'lista_deseos';
-    protected $fillable = ['usuario_id', 'oferta_empleo_id', 'fecha_agregado'];
+
+    protected $fillable = [
+        'usuario_id',
+        'oferta_empleo_id',
+        'fecha_agregado',
+    ];
+
+    protected $casts = [
+        'fecha_agregado' => 'datetime',
+    ];
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class)->withTrashed();
+        return $this->belongsTo(Usuario::class)->withTrashed(); // incluye usuarios eliminados //
     }
 
     public function ofertaEmpleo(): BelongsTo
     {
-        return $this->belongsTo(OfertaEmpleo::class)->withTrashed();
+        return $this->belongsTo(OfertaEmpleo::class)->withTrashed(); // incluye ofertas eliminadas //
     }
 }

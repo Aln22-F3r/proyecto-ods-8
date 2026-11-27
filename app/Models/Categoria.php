@@ -11,10 +11,14 @@ class Categoria extends Model
     use SoftDeletes;
 
     protected $table = 'categorias';
-    protected $fillable = ['nombre', 'descripcion'];
+
+    protected $fillable = [
+        'nombre',
+        'descripcion',
+    ];
 
     public function ofertasEmpleo(): HasMany
     {
-        return $this->hasMany(OfertaEmpleo::class);
+        return $this->hasMany(OfertaEmpleo::class);     // ofertas de la categoría //
     }
 }

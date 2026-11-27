@@ -11,20 +11,26 @@ class Postulacion extends Model
     use SoftDeletes;
 
     protected $table = 'postulaciones';
+
     protected $fillable = [
         'usuario_id',
         'oferta_empleo_id',
+        'cv',
         'fecha_postulacion',
         'estado',
         'comentario',
     ];
 
-    public function usuario(): BelongsTo
+    protected $casts = [
+        'fecha_postulacion' => 'datetime',
+    ];
+
+    public function usuario(): BelongsTo                   // candidato dueño de la postulación //
     {
         return $this->belongsTo(Usuario::class)->withTrashed();
     }
 
-    public function ofertaEmpleo(): BelongsTo
+    public function ofertaEmpleo(): BelongsTo              // oferta a la que se postuló //
     {
         return $this->belongsTo(OfertaEmpleo::class)->withTrashed();
     }

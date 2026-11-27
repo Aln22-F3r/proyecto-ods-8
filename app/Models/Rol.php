@@ -4,16 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Rol extends Model
 {
-    use SoftDeletes;
+    protected $table = 'roles';   // catálogo inamovible: Candidato, Empresa, Administrador //
 
-    protected $table = 'roles';
-    protected $fillable = ['nombre', 'descripcion'];
+    protected $fillable = [
+        'nombre',
+        'descripcion',
+    ];
 
-    public function usuarios(): HasMany
+    public function usuarios(): HasMany   // Usuarios con este rol //
     {
         return $this->hasMany(Usuario::class);
     }

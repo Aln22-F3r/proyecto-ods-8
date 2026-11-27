@@ -6,28 +6,33 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('perfiles', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('usuario_id');
-            $table->foreign('usuario_id')->references('id')->on('usuarios');
-            $table->string('profesion_oficio', 100);
-            $table->text('descripcion');
-            $table->integer('experiencia');
-            $table->text('habilidades');
-            $table->string('ciudad', 100);
-            $table->string('cv', 255);
+
+            // FK 1:1 con usuarios; ON DELETE CASCADE borra el perfil al borrar al usuario //
+            $table->foreignId('usuario_id')
+                ->unique()
+                ->constrained('usuarios')
+                ->cascadeOnDelete();
+
+            $table->string('nombre', 100);                       // obligatorio, min 2 //
+            $table->string('apellido', 100)->nullable();         // opcional //
+            $table->string('telefono', 20)->nullable();          // solo dígitos //
+
+            $table->string('profesion_oficio', 100)->nullable(); // ej. "Ing. Sistemas" //
+            $table->text('descripcion')->nullable();             // bio libre //
+            $table->unsignedInteger('experiencia')->nullable();  // años, 0-60 //
+            $table->text('habilidades')->nullable();             // texto libre //
+            $table->string('ciudad', 100)->nullable();           // residencia //
+            $table->string('cv', 255)->nullable();               // ruta del PDF/DOC en disco //
+            $table->string('foto', 255)->nullable();             // ruta de la imagen en disco //
+
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('perfiles');

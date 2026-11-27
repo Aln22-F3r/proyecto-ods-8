@@ -6,20 +6,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Transaccion extends Model
+class Notificacion extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'transacciones';
+    protected $table = 'notificaciones';
+
     protected $fillable = [
         'usuario_id',
-        'tipo_registro',
-        'descripcion',
+        'titulo',
+        'mensaje',
+        'tipo',
+        'leida',
         'fecha',
-        'estado',
     ];
 
-    public function usuario(): BelongsTo
+    protected $casts = [
+        'leida' => 'boolean',
+        'fecha' => 'datetime',
+    ];
+
+    public function usuario(): BelongsTo   // destinatario (con withTrashed para auditoría) //
     {
         return $this->belongsTo(Usuario::class)->withTrashed();
     }

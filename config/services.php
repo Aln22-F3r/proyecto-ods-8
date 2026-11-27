@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    'stripe' => [
+        'public' => env('STRIPE_PUBLIC_KEY'),
+        'secret' => env('STRIPE_SECRET_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
+    'destacado' => [
+        'precio' => (float) env('DESTACADO_PRECIO', 99.00),
+        'dias'   => (int) env('DESTACADO_DIAS', 30),
+        'moneda' => 'MXN',
+    ],
+
 ];

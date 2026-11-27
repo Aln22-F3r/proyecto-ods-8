@@ -6,27 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('logs', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('usuario_id');
-            $table->foreign('usuario_id')->references('id')->on('usuarios');
-            $table->string('accion', 255);
-            $table->dateTime('fecha');
-            $table->string('ip', 45);
-            $table->timestamps();
+            $table->id();   // identificador del registro //
+
+            $table->foreignId('usuario_id')->nullable()->constrained('usuarios')->nullOnDelete();   // usuario que realizó la acción //
+
+            $table->string('accion', 50);   // tipo de acción realizada //
+            $table->text('descripcion')->nullable();   // detalles de la acción //
+            $table->string('tabla_afectada', 100)->nullable();   // tabla donde ocurrió el cambio //
+            $table->unsignedBigInteger('registro_id')->nullable();   // identificador del registro afectado //
+            $table->dateTime('fecha');   // fecha en que ocurrió la acción //
+
+            $table->timestamps();   // fechas de creación y actualización //
+            $table->softDeletes();   // fecha de eliminación lógica //
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('logs');
+        Schema::dropIfExists('logs');   // elimina la tabla //
     }
 };

@@ -6,24 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('categorias', function (Blueprint $table) {
-            $table->id();
-            $table->string('nombre', 100);
-            $table->string('descripcion', 255);
-            $table->timestamps();
+            $table->id();   // identificador de la categoría //
+
+            $table->string('nombre', 100)->unique();   // nombre único de la categoría //
+            $table->string('descripcion', 255)->nullable();   // descripción opcional //
+
+            $table->timestamps();   // fechas de creación y actualización //
+            $table->softDeletes();   // fecha de eliminación lógica //
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('categorias');
+        Schema::dropIfExists('categorias');   // elimina la tabla //
     }
 };

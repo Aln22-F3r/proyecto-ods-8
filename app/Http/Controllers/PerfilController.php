@@ -4,194 +4,158 @@ namespace App\Http\Controllers;
 
 use App\Models\Perfil;
 use App\Models\Usuario;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Throwable;
 
 class PerfilController extends Controller
 {
-    public function index()
-    {
-        return response()->json([
-            'data' => Perfil::with('usuario:id,nombre,apellido')
-                ->paginate(15),
-        ]);
-    }
+    private const ROL_ADMIN = 'Administrador';        // nombre exacto del rol admin //
+    private const ZONA      = 'America/Mexico_City';  // zona horaria para fechas //
 
-    public function eliminados()
-    {
-        return response()->json([
-            'data' => Perfil::onlyTrashed()
-                ->with('usuario:id,nombre,apellido')
-                ->paginate(15),
-        ]);
-    }
+    // ================== ENDPOINTS DEL DUEÑO ================== //
 
-    public function show($id)
+    // GET /perfil: devuelve el perfil del usuario autenticado (cualquier rol) //
+    public function miPerfil(Request $request): JsonResponse
     {
-        $perfil = Perfil::withTrashed()
-            ->with('usuario:id,nombre,apellido,correo')
-            ->find($id);
+        $perfil = Perfil::with(['usuario.rol:id,nombre'])
+            ->where('usuario_id', $request->user()->id)
+            ->first();
 
         if (!$perfil) {
-            return response()->json([
-                'message' => 'El perfil solicitado no existe.',
-            ], 404);
+            return response()->json(['message' => 'No tienes un perfil registrado.'], 404);
         }
 
-        $zona = 'America/Mexico_City';
-
-        return response()->json([
-            'data' => [
-                'id' => $perfil->id,
-                'usuario_id' => $perfil->usuario_id,
-                'usuario' => $perfil->usuario
-                    ? "{$perfil->usuario->nombre} {$perfil->usuario->apellido}"
-                    : null,
-                'correo' => $perfil->usuario?->correo,
-                'profesion_oficio' => $perfil->profesion_oficio,
-                'descripcion' => $perfil->descripcion,
-                'experiencia' => $perfil->experiencia,
-                'habilidades' => $perfil->habilidades,
-                'ciudad' => $perfil->ciudad,
-                'cv' => $this->urlSiExiste($perfil->cv),
-                'foto' => $this->urlSiExiste($perfil->foto),
-                'creado' => $perfil->created_at?->timezone($zona)->format('d/m/Y H:i'),
-                'actualizado' => $perfil->updated_at?->timezone($zona)->format('d/m/Y H:i'),
-                'eliminado' => $perfil->trashed(),
-                'fecha_eliminacion' => $perfil->deleted_at?->timezone($zona)->format('d/m/Y H:i'),
-            ],
-        ]);
+        return response()->json(['data' => $this->formatearPerfil($perfil)]);
     }
 
-    public function store(Request $request)
+    // PUT /perfil: actualiza el perfil del usuario autenticado //
+    public function actualizarMiPerfil(Request $request): JsonResponse
     {
+        $perfil = Perfil::with(['usuario.rol:id,nombre'])
+            ->where('usuario_id', $request->user()->id)
+            ->first();
+
+        if (!$perfil) {
+            return response()->json(['message' => 'No tienes un perfil registrado.'], 404);
+        }
+
+        return $this->procesarActualizacion($request, $perfil);
+    }
+
+    // ================== ADMIN: LECTURA ================== //
+
+    // GET /admin/perfiles: lista perfiles de usuarios activos //
+    public function index(Request $request): JsonResponse
+    {
+        Gate::authorize('consultar');   // nivel 1, 2 o 3 //
+
+        // whereHas('usuario') oculta perfiles cuyos usuarios fueron soft-deleted //
+        $query = Perfil::with(['usuario.rol:id,nombre'])->whereHas('usuario');
+
+        // Nivel <3 no ve perfiles de admins //
+        if ($request->user()->nivel < 3) {
+            $query->whereHas('usuario.rol', fn($q) => $q->where('nombre', '!=', self::ROL_ADMIN));
+        }
+
+        return response()->json(['data' => $query->paginate(15)]);
+    }
+
+    // GET /admin/perfiles/eliminados: perfiles cuyos usuarios están soft-deleted (solo nivel 3) //
+    public function eliminados(Request $request): JsonResponse
+    {
+        Gate::authorize('eliminar');   // solo nivel 3 //
+
+        $query = Perfil::with([
+            // withTrashed para poder ver los datos del usuario borrado //
+            'usuario' => fn($q) => $q->withTrashed()->select('id', 'correo', 'rol_id', 'estado', 'deleted_at'),
+            'usuario.rol:id,nombre',
+        ])
+            ->whereHas('usuario', fn($q) => $q->onlyTrashed());   // solo perfiles de usuarios borrados //
+
+        return response()->json(['data' => $query->paginate(15)]);
+    }
+
+    // GET /admin/perfiles/{id}: detalle de un perfil activo //
+    public function show(Request $request, $id): JsonResponse
+    {
+        $actor = $request->user();
+
+        $perfil = Perfil::with(['usuario.rol:id,nombre'])->find($id);
+
+        if (!$perfil) {
+            return response()->json(['message' => 'El perfil solicitado no existe o su usuario está eliminado.'], 404);
+        }
+
+        if (!$this->puedeVer($actor, $perfil)) {
+            return response()->json(['message' => 'No tienes permiso para consultar este perfil.'], 403);
+        }
+
+        return response()->json(['data' => $this->formatearPerfil($perfil)]);
+    }
+
+    // ================== ADMIN: ESCRITURA ================== //
+
+    // PUT /admin/perfiles/{id}: editar perfil de otro usuario con reglas por nivel //
+    public function update(Request $request, $id): JsonResponse
+    {
+        $perfil = Perfil::with(['usuario.rol:id,nombre'])->find($id);
+
+        if (!$perfil) {
+            return response()->json(['message' => 'El perfil solicitado no existe o su usuario está eliminado.'], 404);
+        }
+
+        return $this->procesarActualizacion($request, $perfil);
+    }
+
+    // ================== LÓGICA COMPARTIDA ================== //
+
+    // Actualización compartida entre 'update' y 'actualizarMiPerfil' //
+    private function procesarActualizacion(Request $request, Perfil $perfil): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (!$this->puedeEditar($actor, $perfil)) {
+            return response()->json(['message' => 'No tienes permiso para modificar este perfil.'], 403);
+        }
+
         $datos = $this->validar($request);
-        $archivosNuevos = [];
 
-        try {
-            $perfil = DB::transaction(function () use (
-                $request,
-                $datos,
-                &$archivosNuevos
-            ) {
-                // Crear el registro para obtener su ID. //
-                $perfil = Perfil::create([
-                    'usuario_id' => $datos['usuario_id'],
-                    'profesion_oficio' => $datos['profesion_oficio'],
-                    'descripcion' => $datos['descripcion'],
-                    'experiencia' => $datos['experiencia'],
-                    'habilidades' => $datos['habilidades'],
-                    'ciudad' => $datos['ciudad'],
-                    'cv' => '',
-                ]);
+        // Solo campos de texto; cv y foto se manejan aparte por ser archivos //
+        $perfil->fill(collect($datos)->except(['cv', 'foto'])->all());
 
-                // Guardar el CV. //
-                $cv = $request->file('cv');
-                $nombreCv = 'Perfil_' . $perfil->id . '_cv_'
-                    . Str::uuid() . '.' . $cv->extension();
+        $archivoNuevo = $request->hasFile('cv') || $request->hasFile('foto');
 
-                $rutaCv = $cv->storeAs('cv', $nombreCv, 'public');
-                $archivosNuevos[] = $rutaCv;
-                $perfil->cv = Storage::url($rutaCv);
-
-                // Guardar la foto si fue enviada. //
-                if ($request->hasFile('foto')) {
-                    $foto = $request->file('foto');
-                    $nombreFoto = 'Perfil_' . $perfil->id . '_'
-                        . Str::uuid() . '.' . $foto->extension();
-
-                    $rutaFoto = $foto->storeAs(
-                        'imagenes',
-                        $nombreFoto,
-                        'public'
-                    );
-
-                    $archivosNuevos[] = $rutaFoto;
-                    $perfil->foto = Storage::url($rutaFoto);
-                }
-
-                $perfil->save();
-
-                return $perfil;
-            });
-        } catch (Throwable $e) {
-            report($e);
-
-            foreach ($archivosNuevos as $archivo) {
-                Storage::disk('public')->delete($archivo);
-            }
-
-            return response()->json([
-                'message' => 'No se pudo guardar el perfil. Intenta de nuevo.',
-            ], 500);
-        }
-
-        return response()->json([
-            'message' => 'Perfil creado correctamente.',
-            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
-        ], 201);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $perfil = Perfil::find($id);
-
-        if (!$perfil) {
-            return response()->json([
-                'message' => 'El perfil solicitado no existe o está eliminado.',
-            ], 404);
-        }
-
-        $datos = $this->validar($request, $perfil->id);
-
-        // Los datos de texto se actualizan por separado de los archivos. //
-        $perfil->fill(
-            collect($datos)->except(['cv', 'foto'])->all()
-        );
-
-        $archivoNuevo = $request->hasFile('cv')
-            || $request->hasFile('foto');
-
+        // Sin cambios de texto ni archivos → no hacer UPDATE //
         if (!$perfil->isDirty() && !$archivoNuevo) {
             return response()->json([
                 'message' => 'No se realizaron cambios en el perfil.',
-                'data' => $perfil->load('usuario:id,nombre,apellido'),
+                'data'    => $this->formatearPerfil($perfil->fresh(['usuario.rol:id,nombre'])),
             ]);
         }
 
-        $archivosNuevos = [];
-        $archivosAnteriores = [];
+        $archivosNuevos = [];      // para rollback si falla el save //
+        $archivosAnteriores = [];  // para borrar tras guardar con éxito //
 
         try {
+            // CV nuevo → guardar y encolar borrado del anterior //
             if ($request->hasFile('cv')) {
                 $cv = $request->file('cv');
-
-                $nombreCv = 'Perfil_' . $perfil->id . '_cv_'
-                    . Str::uuid() . '.' . $cv->extension();
-
+                $nombreCv = 'Perfil_' . $perfil->id . '_cv_' . Str::uuid() . '.' . $cv->extension();
                 $rutaCv = $cv->storeAs('cv', $nombreCv, 'public');
                 $archivosNuevos[] = $rutaCv;
-
                 $archivosAnteriores[] = $perfil->cv;
                 $perfil->cv = Storage::url($rutaCv);
             }
 
+            // Foto nueva → mismo patrón //
             if ($request->hasFile('foto')) {
                 $foto = $request->file('foto');
-
-                $nombreFoto = 'Perfil_' . $perfil->id . '_'
-                    . Str::uuid() . '.' . $foto->extension();
-
-                $rutaFoto = $foto->storeAs(
-                    'imagenes',
-                    $nombreFoto,
-                    'public'
-                );
-
+                $nombreFoto = 'Perfil_' . $perfil->id . '_' . Str::uuid() . '.' . $foto->extension();
+                $rutaFoto = $foto->storeAs('imagenes', $nombreFoto, 'public');
                 $archivosNuevos[] = $rutaFoto;
                 $archivosAnteriores[] = $perfil->foto;
                 $perfil->foto = Storage::url($rutaFoto);
@@ -201,138 +165,100 @@ class PerfilController extends Controller
         } catch (Throwable $e) {
             report($e);
 
+            // Rollback: borrar archivos recién guardados //
             foreach ($archivosNuevos as $archivo) {
                 Storage::disk('public')->delete($archivo);
             }
 
-            return response()->json([
-                'message' => 'No se pudo actualizar el perfil. Intenta de nuevo.',
-            ], 500);
+            return response()->json(['message' => 'No se pudo actualizar el perfil. Intenta de nuevo.'], 500);
         }
 
-        // Eliminar los archivos anteriores después de guardar correctamente. //
+        // Borrar archivos anteriores solo si el save fue exitoso //
         foreach ($archivosAnteriores as $archivo) {
             $this->borrarArchivo($archivo);
         }
 
         return response()->json([
             'message' => 'Perfil actualizado correctamente.',
-            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
+            'data'    => $this->formatearPerfil($perfil->fresh(['usuario.rol:id,nombre'])),
         ]);
     }
 
-    // Borrado lógico: conserva el registro y sus archivos. //
-    public function destroy($id)
+    // ================== AUTORIZACIÓN ================== //
+
+    // Reglas de quién puede VER un perfil (dueño o admin con nivel) //
+    private function puedeVer(Usuario $actor, Perfil $perfil): bool
     {
-        $perfil = Perfil::with('usuario:id,nombre,apellido')->find($id);
-
-        if (!$perfil) {
-            return response()->json([
-                'message' => 'El perfil solicitado no existe o ya fue eliminado.',
-            ], 404);
+        if ($actor->id === $perfil->usuario_id) {
+            return true;   // dueño siempre ve el suyo //
         }
 
-        $etiqueta = $this->etiqueta($perfil);
-
-        try {
-            $perfil->delete();
-        } catch (Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo eliminar el perfil. Intenta de nuevo.',
-            ], 500);
+        if ($actor->rol?->nombre !== self::ROL_ADMIN) {
+            return false;  // no admin no ve perfiles ajenos //
         }
 
-        return response()->json([
-            'message' => "{$etiqueta} se eliminó. Puedes restaurarlo desde la lista de eliminados.",
-        ]);
+        if ($actor->nivel >= 3) {
+            return true;   // nivel 3 ve todo //
+        }
+
+        // Nivel 1 y 2 no ven perfiles de admins //
+        return $perfil->usuario?->rol?->nombre !== self::ROL_ADMIN;
     }
 
-    public function restore($id)
+    // Reglas de quién puede EDITAR un perfil (dueño o admin con nivel) //
+    private function puedeEditar(Usuario $actor, Perfil $perfil): bool
     {
-        $perfil = Perfil::onlyTrashed()
-            ->with('usuario:id,nombre,apellido')
-            ->find($id);
-
-        if (!$perfil) {
-            return response()->json([
-                'message' => 'El perfil solicitado no existe o no está eliminado.',
-            ], 404);
+        if ($actor->id === $perfil->usuario_id) {
+            return true;
         }
 
-        try {
-            $perfil->restore();
-        } catch (Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo restaurar el perfil. Intenta de nuevo.',
-            ], 500);
+        if ($actor->rol?->nombre !== self::ROL_ADMIN) {
+            return false;
         }
 
-        return response()->json([
-            'message' => "{$this->etiqueta($perfil)} se restauró correctamente.",
-            'data' => $perfil->fresh()->load('usuario:id,nombre,apellido'),
-        ]);
+        if ($actor->nivel < 2) {
+            return false;  // nivel 1 no edita //
+        }
+
+        // Nivel 2 no edita perfiles de admins //
+        $targetEsAdmin = $perfil->usuario?->rol?->nombre === self::ROL_ADMIN;
+
+        return !($targetEsAdmin && $actor->nivel < 3);
     }
 
-    // Borrado físico: exige que el perfil ya esté eliminado lógicamente. //
-    public function forceDelete($id)
+    // ================== HELPERS ================== //
+
+    // Estructura uniforme de respuesta para un perfil //
+    private function formatearPerfil(Perfil $perfil): array
     {
-        $perfil = Perfil::withTrashed()
-            ->with('usuario:id,nombre,apellido')
-            ->find($id);
-
-        if (!$perfil) {
-            return response()->json([
-                'message' => 'El perfil solicitado no existe.',
-            ], 404);
-        }
-
-        if (!$perfil->trashed()) {
-            return response()->json([
-                'message' => 'El perfil debe eliminarse primero antes de borrarlo definitivamente.',
-            ], 409);
-        }
-
-        $etiqueta = $this->etiqueta($perfil);
-        $archivos = [$perfil->cv, $perfil->foto];
-
-        try {
-            $perfil->forceDelete();
-        } catch (Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'No se pudo eliminar definitivamente el perfil. Intenta de nuevo.',
-            ], 500);
-        }
-
-        // Eliminar los archivos después de borrar el registro. //
-        foreach ($archivos as $archivo) {
-            $this->borrarArchivo($archivo);
-        }
-
-        return response()->json([
-            'message' => "{$etiqueta} se eliminó definitivamente, junto con su CV y su foto.",
-        ]);
+        return [
+            'id'                => $perfil->id,
+            'usuario_id'        => $perfil->usuario_id,
+            'correo'            => $perfil->usuario?->correo,
+            'rol'               => $perfil->usuario?->rol?->nombre,
+            'usuario_eliminado' => (bool) $perfil->usuario?->trashed(),  // flag útil en admin //
+            'nombre'            => $perfil->nombre,
+            'apellido'          => $perfil->apellido,
+            'telefono'          => $perfil->telefono,
+            'profesion_oficio'  => $perfil->profesion_oficio,
+            'descripcion'       => $perfil->descripcion,
+            'experiencia'       => $perfil->experiencia,
+            'habilidades'       => $perfil->habilidades,
+            'ciudad'            => $perfil->ciudad,
+            'cv'                => $this->urlSiExiste($perfil->cv),
+            'foto'              => $this->urlSiExiste($perfil->foto),
+            'creado'            => $perfil->created_at?->timezone(self::ZONA)->format('d/m/Y H:i'),
+            'actualizado'       => $perfil->updated_at?->timezone(self::ZONA)->format('d/m/Y H:i'),
+        ];
     }
 
-    private function etiqueta(Perfil $perfil): string
-    {
-        $usuario = $perfil->usuario
-            ? "{$perfil->usuario->nombre} {$perfil->usuario->apellido}"
-            : 'un usuario';
-
-        return "El perfil de «{$usuario}»";
-    }
-
+    // /storage/cv/x.pdf → cv/x.pdf //
     private function relativa(?string $ruta): ?string
     {
         return $ruta ? Str::after($ruta, '/storage/') : null;
     }
 
+    // Devuelve URL pública si el archivo existe en disco, si no null //
     private function urlSiExiste(?string $ruta): ?string
     {
         $relativa = $this->relativa($ruta);
@@ -342,6 +268,7 @@ class PerfilController extends Controller
             : null;
     }
 
+    // Borra un archivo del disco 'public' si existe //
     private function borrarArchivo(?string $ruta): void
     {
         $relativa = $this->relativa($ruta);
@@ -351,58 +278,45 @@ class PerfilController extends Controller
         }
     }
 
-    private function validar(Request $request, $id = null): array
+    // Validación de actualización: todos 'sometimes' porque PUT/PATCH permiten parciales //
+    private function validar(Request $request): array
     {
         return $request->validate([
-            'usuario_id' => [
-                'required',
-                'exists:usuarios,id',
-                Rule::unique('perfiles', 'usuario_id')->ignore($id),
-            ],
-            'profesion_oficio' => [
-                'required',
-                'string',
-                'min:3',
-                'max:100',
-            ],
-            'descripcion' => ['required', 'string', 'min:10'],
-            'experiencia' => ['required', 'integer', 'min:0', 'max:60'],
-            'habilidades' => ['required', 'string', 'min:3'],
-            'ciudad' => ['required', 'string', 'min:2', 'max:100'],
-            'cv' => [
-                $id ? 'nullable' : 'required',
-                'file',
-                'mimes:pdf,doc,docx',
-                'max:5120',
-            ],
-            'foto' => [
-                'nullable',
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:2048',
-            ],
+            'nombre'           => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
+            'apellido'         => ['sometimes', 'nullable', 'string', 'min:2', 'max:100'],
+            'telefono'         => ['sometimes', 'nullable', 'digits_between:10,20'],
+            'profesion_oficio' => ['sometimes', 'nullable', 'string', 'min:3', 'max:100'],
+            'descripcion'      => ['sometimes', 'nullable', 'string', 'min:10'],
+            'experiencia'      => ['sometimes', 'nullable', 'integer', 'min:0', 'max:60'],
+            'habilidades'      => ['sometimes', 'nullable', 'string', 'min:3'],
+            'ciudad'           => ['sometimes', 'nullable', 'string', 'min:2', 'max:100'],
+            'cv'               => ['sometimes', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+            'foto'             => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ], [
-            'required' => 'El campo :attribute es obligatorio.',
-            'string' => 'El campo :attribute debe ser texto.',
-            'min' => 'El campo :attribute debe tener al menos :min caracteres.',
-            'max' => 'El campo :attribute no puede tener más de :max caracteres.',
-            'exists' => 'El usuario seleccionado no es válido.',
-            'unique' => 'Ese usuario ya tiene un perfil.',
-            'integer' => 'La experiencia debe ser un número entero.',
+            'required'        => 'El campo :attribute es obligatorio.',
+            'string'          => 'El campo :attribute debe ser texto.',
+            'min'             => 'El campo :attribute debe tener al menos :min caracteres.',
+            'max'             => 'El campo :attribute no puede tener más de :max caracteres.',
+            'integer'         => 'La experiencia debe ser un número entero.',
             'experiencia.min' => 'La experiencia no puede ser negativa.',
             'experiencia.max' => 'La experiencia no puede ser mayor a :max años.',
-            'file' => 'El campo :attribute debe ser un archivo.',
-            'image' => 'La foto debe ser una imagen.',
-            'cv.mimes' => 'El CV debe ser un archivo PDF o Word (pdf, doc, docx).',
-            'cv.max' => 'El CV no puede pesar más de 5 MB.',
-            'foto.mimes' => 'La foto debe ser de tipo jpg, jpeg, png o webp.',
-            'foto.max' => 'La foto no puede pesar más de 2 MB.',
+            'file'            => 'El campo :attribute debe ser un archivo.',
+            'image'           => 'La foto debe ser una imagen.',
+            'cv.mimes'        => 'El CV debe ser un archivo PDF o Word (pdf, doc, docx).',
+            'cv.max'          => 'El CV no puede pesar más de 5 MB.',
+            'foto.mimes'      => 'La foto debe ser de tipo jpg, jpeg, png o webp.',
+            'foto.max'        => 'La foto no puede pesar más de 2 MB.',
+            'digits_between'  => 'El teléfono debe tener entre :min y :max dígitos.',
         ], [
-            'usuario_id' => 'usuario',
+            'nombre'           => 'nombre',
+            'apellido'         => 'apellido',
+            'telefono'         => 'teléfono',
             'profesion_oficio' => 'profesión u oficio',
-            'descripcion' => 'descripción',
-            'experiencia' => 'experiencia',
-            'cv' => 'CV',
+            'descripcion'      => 'descripción',
+            'experiencia'      => 'experiencia',
+            'ciudad'           => 'ciudad',
+            'cv'               => 'CV',
+            'foto'             => 'foto',
         ]);
     }
 }

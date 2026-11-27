@@ -4,15 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Perfil extends Model
 {
-    use SoftDeletes;
+    // Sin SoftDeletes: vive y muere con el usuario (cascade) //
 
     protected $table = 'perfiles';
+
     protected $fillable = [
         'usuario_id',
+        'nombre',
+        'apellido',
+        'telefono',
         'profesion_oficio',
         'descripcion',
         'experiencia',
@@ -22,8 +25,12 @@ class Perfil extends Model
         'foto',
     ];
 
-    public function usuario(): BelongsTo
+    protected $casts = [
+        'experiencia' => 'integer',   // se guarda como int //
+    ];
+
+    public function usuario(): BelongsTo   // Dueño del perfil; sin withTrashed() para que whereHas('usuario') oculte borrados //
     {
-        return $this->belongsTo(Usuario::class)->withTrashed();
+        return $this->belongsTo(Usuario::class);
     }
 }
