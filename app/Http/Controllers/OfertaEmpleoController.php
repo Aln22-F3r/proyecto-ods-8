@@ -57,6 +57,26 @@ class OfertaEmpleoController extends Controller
         );
     }
 
+    public function publicIndex(Request $request)
+    {
+        $query = OfertaEmpleo::with([
+            'categoria:id,nombre',
+            'usuario:id,correo,rol_id',
+            'usuario.perfil:usuario_id,nombre',
+        ])
+            ->withCount(['postulaciones', 'listaDeseos'])
+            ->where('estado', 'Abierta')                  // Solo ofertas activas //
+            ->orderByDesc('destacada')                    // Las de pago aparecen primero //
+            ->orderByDesc('fecha_publicacion');
+
+        // Filtro opcional por categoría para la vista pública //
+        if ($request->filled('categoria_id')) {
+            $query->where('categoria_id', $request->categoria_id);
+        }
+
+        return response()->json($query->paginate(12)); // 12 por página para el grid de React //
+    }
+
     // GET /admin/ofertas/eliminados: solo admin nivel 3, lista soft-deleted //
     public function eliminados(Request $request)
     {
@@ -74,8 +94,8 @@ class OfertaEmpleoController extends Controller
         return response()->json($query->paginate(15));
     }
 
-    // GET: detalle de una oferta (con withTrashed para que el admin vea eliminadas) //
-    public function show($id)
+    // GET: detalle de una oferta (soporta invitados y usuarios logueados) //
+    public function show(Request $request, $id)
     {
         $oferta = OfertaEmpleo::withTrashed()
             ->with([
@@ -90,7 +110,17 @@ class OfertaEmpleoController extends Controller
             return response()->json(['message' => 'La oferta de empleo solicitada no existe.'], 404);
         }
 
-        $this->authorize('view', $oferta);
+        $actor = $request->user();
+
+        // Si el visitante está logueado, aplicamos las reglas normales de la Policy //
+        if ($actor) {
+            $this->authorize('view', $oferta);
+        } else {
+            // Si es un invitado (ruta pública), solo puede ver ofertas abiertas y no eliminadas //
+            if ($oferta->trashed() || $oferta->estado !== 'Abierta') {
+                return response()->json(['message' => 'La oferta no está disponible.'], 404);
+            }
+        }
 
         return response()->json(['data' => $this->formatear($oferta)]);
     }

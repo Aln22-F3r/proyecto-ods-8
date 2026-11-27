@@ -26,6 +26,10 @@ Route::post('/auth/register', [AuthController::class, 'register']);
 // Roles disponibles para el formulario de registro (nunca incluye Administrador) //
 Route::get('/roles/registro', [RolController::class, 'registro']);
 
+// Catálogo público de ofertas (sin token) //
+Route::get('/ofertas-publicas', [OfertaEmpleoController::class, 'publicIndex']);
+Route::get('/ofertas-publicas/{id}', [OfertaEmpleoController::class, 'show']);
+
 // ==================== RUTAS AUTENTICADAS (cualquier rol) ==================== //
 
 Route::middleware(['auth:sanctum', 'usuario.activo'])->group(function () {
