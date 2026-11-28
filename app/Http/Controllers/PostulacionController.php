@@ -45,7 +45,7 @@ class PostulacionController extends Controller
             $query->where('usuario_id', $actor->id);
         }
 
-        // Empresa: solo las postulaciones a sus ofertas NO eliminadas //
+        // Empresa: solo las recibidas en sus ofertas //
         if ($rol === 'Empresa') {
             $query->whereHas(
                 'ofertaEmpleo',
@@ -54,23 +54,26 @@ class PostulacionController extends Controller
             );
         }
 
-        // Filtros opcionales (admin y también empresa/candidato por comodidad) //
+        // Filtros //
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
         }
-
         if ($request->filled('oferta_empleo_id')) {
             $query->where('oferta_empleo_id', $request->oferta_empleo_id);
         }
-
-        // Solo el admin puede filtrar por usuario_id (para auditar a un candidato) //
         if ($rol === 'Administrador' && $request->filled('usuario_id')) {
             $query->where('usuario_id', $request->usuario_id);
         }
 
-        return response()->json(
-            $query->orderByDesc('fecha_postulacion')->paginate(15)
-        );
+        // Paginamos //
+        $postulaciones = $query->orderByDesc('fecha_postulacion')->paginate(15);
+
+        // 🔥 LA MAGIA ESTÁ AQUÍ: Aplicamos el formateador a cada elemento de la página //
+        $postulaciones->getCollection()->transform(function ($item) {
+            return $this->formatear($item);
+        });
+
+        return response()->json($postulaciones);
     }
 
     // GET /admin/postulaciones/eliminados: solo admin nivel 3, lista soft-deleted //

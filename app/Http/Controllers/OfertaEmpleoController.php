@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\OfertaEmpleo;
 use App\Models\Usuario;
+use App\Models\Postulacion;
 use App\Services\LogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ class OfertaEmpleoController extends Controller
     {
         $this->authorize('viewAny', OfertaEmpleo::class);
 
-        $actor = $request->user();
+        $actor = $request->user('sanctum'); // Busca explícitamente usando Sanctum en rutas públicas //
         $rol   = $actor->rol?->nombre;
 
         $query = OfertaEmpleo::with([
@@ -94,7 +95,7 @@ class OfertaEmpleoController extends Controller
         return response()->json($query->paginate(15));
     }
 
-    // GET: detalle de una oferta (soporta invitados y usuarios logueados) //
+    // GET: detalle de una oferta (soporta invitados, candidatos y empresas) //
     public function show(Request $request, $id)
     {
         $oferta = OfertaEmpleo::withTrashed()
@@ -110,19 +111,45 @@ class OfertaEmpleoController extends Controller
             return response()->json(['message' => 'La oferta de empleo solicitada no existe.'], 404);
         }
 
-        $actor = $request->user();
+        $actor = $request->user('sanctum'); // Extrae el usuario por el token de Sanctum //
 
-        // Si el visitante está logueado, aplicamos las reglas normales de la Policy //
+        // 1. Verificación de acceso (Policy o Invitado) //
         if ($actor) {
-            $this->authorize('view', $oferta);
+            // Le pasamos el actor explícitamente al Gate para que no busque en el guard 'web' //
+            Gate::forUser($actor)->authorize('view', $oferta);
         } else {
-            // Si es un invitado (ruta pública), solo puede ver ofertas abiertas y no eliminadas //
+            // Si es un invitado (sin token), validamos que esté abierta y no eliminada //
             if ($oferta->trashed() || $oferta->estado !== 'Abierta') {
                 return response()->json(['message' => 'La oferta no está disponible.'], 404);
             }
         }
 
-        return response()->json(['data' => $this->formatear($oferta)]);
+        // 2. Formatear la oferta base //
+        $data = $this->formatear($oferta);
+
+        // 3. Agregar contexto si el usuario está logueado //
+        if ($actor) {
+            $rol = $actor->rol?->nombre;
+
+            // Si es Candidato: verificamos si ya se postuló //
+            if ($rol === 'Candidato') {
+                $postulacion = Postulacion::withTrashed()
+                    ->where('usuario_id', $actor->id)
+                    ->where('oferta_empleo_id', $oferta->id)
+                    ->first();
+
+                $data['ya_postulado'] = $postulacion && !$postulacion->trashed();
+                $data['mi_postulacion_id'] = $postulacion?->id;
+                $data['mi_postulacion_estado'] = $postulacion?->estado;
+            }
+
+            // Si es Empresa: verificamos si es la dueña de la oferta //
+            if ($rol === 'Empresa' && $oferta->usuario_id === $actor->id) {
+                $data['es_mi_oferta'] = true;
+            }
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     // ======================= ESCRITURA ======================= //
