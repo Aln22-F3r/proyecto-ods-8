@@ -1,28 +1,54 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ofertaService } from "../services/ofertaService";
+import { postulacionService } from "../services/postulacionService";
+import { useAuth } from "../context/AuthContext";
 import Spinner from "../components/Spinner";
 
 const OfertaDetail = () => {
   const { id } = useParams();
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
   const [oferta, setOferta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [postulando, setPostulando] = useState(false);
+
+  const fetchOferta = async () => {
+    try {
+      setLoading(true);
+      const data = await ofertaService.getOfertaById(id);
+      setOferta(data);
+    } catch (err) {
+      setError("Oferta no encontrada o eliminada.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOferta = async () => {
-      try {
-        setLoading(true);
-        const data = await ofertaService.getOfertaById(id);
-        setOferta(data);
-      } catch (err) {
-        setError("Oferta no encontrada o eliminada.");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchOferta();
   }, [id]);
+
+  const handlePostularme = async () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setPostulando(true);
+      await postulacionService.crear(oferta.id);
+      alert("¡Postulación enviada exitosamente!");
+      fetchOferta(); // Recargamos para que el botón cambie de estado
+    } catch (err) {
+      // Muestra el mensaje exacto del backend (ej. "El candidato no tiene un CV...")
+      alert(err.response?.data?.message || "Error al postularse.");
+    } finally {
+      setPostulando(false);
+    }
+  };
 
   if (loading)
     return (
@@ -39,6 +65,36 @@ const OfertaDetail = () => {
         </Link>
       </div>
     );
+
+  // Lógica para decidir qué mostrar en el botón de acción //
+  const renderAccion = () => {
+    if (oferta.es_mi_oferta) {
+      return (
+        <div className="bg-gray-100 text-gray-600 px-6 py-3 rounded-lg text-lg font-bold">
+          Esta es tu oferta
+        </div>
+      );
+    }
+    if (user?.rol === "Empresa") {
+      return null; // Una empresa no se postula a ofertas
+    }
+    if (oferta.ya_postulado) {
+      return (
+        <div className="bg-green-100 text-green-800 px-6 py-3 rounded-lg text-lg font-bold">
+          Ya te postulaste (Estado: {oferta.mi_postulacion_estado})
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={handlePostularme}
+        disabled={postulando}
+        className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-bold hover:bg-blue-700 transition disabled:bg-gray-400"
+      >
+        {postulando ? "Enviando..." : "Postularme a esta oferta"}
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -57,9 +113,7 @@ const OfertaDetail = () => {
               <h1 className="text-3xl font-bold text-gray-800">
                 {oferta.titulo}
               </h1>
-              <p className="text-lg text-gray-600 mt-2">
-                {oferta.usuario?.perfil?.nombre}
-              </p>
+              <p className="text-lg text-gray-600 mt-2">{oferta.empresa}</p>
             </div>
             <span
               className={`px-4 py-1 rounded-full text-sm font-bold ${oferta.estado === "Abierta" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
@@ -89,7 +143,7 @@ const OfertaDetail = () => {
             <div>
               <span className="text-gray-500 text-sm">Categoría</span>
               <br />
-              <strong>{oferta.categoria?.nombre}</strong>
+              <strong>{oferta.categoria}</strong>
             </div>
           </div>
 
@@ -100,11 +154,7 @@ const OfertaDetail = () => {
             {oferta.descripcion}
           </p>
 
-          <div className="text-center mt-8">
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-bold hover:bg-blue-700 transition">
-              Postularme a esta oferta
-            </button>
-          </div>
+          <div className="text-center mt-8 border-t pt-8">{renderAccion()}</div>
         </div>
       </main>
     </div>
